@@ -18,7 +18,6 @@ const AudioEngine = {
     const now = ctx.currentTime;
 
     if (type === "hit") {
-      // Coup sec de poing (baisse rapide de fréquence)
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "triangle";
@@ -32,7 +31,6 @@ const AudioEngine = {
       osc.stop(now + 0.12);
 
     } else if (type === "block") {
-      // Bûche de substitution Kawarimi (résonance boisée)
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
@@ -46,13 +44,10 @@ const AudioEngine = {
       osc.stop(now + 0.18);
 
     } else if (type === "clone") {
-      // Bruit blanc filtré ("Poof" d'invocation)
       const bufferSize = ctx.sampleRate * 0.15;
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-      }
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
       const noise = ctx.createBufferSource();
       noise.buffer = buffer;
 
@@ -71,7 +66,6 @@ const AudioEngine = {
       noise.start(now);
 
     } else if (type === "slash") {
-      // Tranchant métallique d'épée / Senbon
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sawtooth";
@@ -85,7 +79,6 @@ const AudioEngine = {
       osc.stop(now + 0.14);
 
     } else if (type === "kyubi") {
-      // Rugissement sourd de Chakra démoniaque
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sawtooth";
@@ -101,9 +94,10 @@ const AudioEngine = {
   }
 };
 
-// --- ÉTAT DU JEU & LOGIQUE DE COMBAT ---
+// --- ÉTAT DU JEU ---
 let currentStageIndex = 0;
 let activeRelic = null;
+let isGameOver = false;
 
 const state = {
   player: { hp: 60, maxHp: 60, shield: 0, chakra: 3, maxChakra: 3, clones: 0 },
@@ -114,6 +108,7 @@ const state = {
 };
 
 function initGame() {
+  isGameOver = false;
   state.deck = [
     { ...CARDS_POOL[0] }, { ...CARDS_POOL[0] }, { ...CARDS_POOL[0] },
     { ...CARDS_POOL[1] }, { ...CARDS_POOL[1] }, { ...CARDS_POOL[1] },
@@ -131,12 +126,16 @@ function loadStage(index) {
   document.body.className = stage.bgClass;
   document.getElementById("stage-title").innerText = stage.title;
 
+  // Réinitialisation de l'ennemi
   state.enemy.hp = stage.maxHp;
   state.enemy.maxHp = stage.maxHp;
   state.enemy.shield = 0;
   state.enemy.mist = false;
   state.enemy.turnCount = 1;
+
+  // Réinitialisation du joueur pour le nouveau combat (Fix Bug Chakra & Bouclier)
   state.player.shield = 0;
+  state.player.chakra = state.player.maxChakra;
   state.player.clones = 0;
   renderClones();
 
@@ -147,9 +146,12 @@ function loadStage(index) {
   const enemyImg = document.getElementById("enemy-img");
   enemyImg.src = stage.sprite;
 
-  state.discard.push(...state.hand);
+  // Recyclage complet des cartes (pioche + main + défausse mélangées)
+  state.deck.push(...state.hand, ...state.discard);
   state.hand = [];
+  state.discard = [];
   shuffle(state.deck);
+
   drawCards(4);
   updateUI();
   document.getElementById("log").innerText = `Combat : ${stage.name} !`;
@@ -197,28 +199,51 @@ function triggerShake(id) {
   el.classList.add("shake");
 }
 
+function checkPlayerDeath() {
+  if (state.player.hp <= 0 && !isGameOver) {
+    isGameOver = true;
+    state.player.hp = 0;
+    updateUI();
+    showGameOverScreen();
+    return true;
+  }
+  return false;
+}
+
+function showGameOverScreen() {
+  const overlay = document.getElementById("overlay");
+  overlay.style.display = "flex";
+  document.getElementById("overlay-title").innerText = "DÉFAITE...";
+  document.getElementById("overlay-title").style.color = "#ef4444";
+  document.getElementById("overlay-sub").innerText = "Naruto est tombé au combat. La mission du Pays des Vagues a échoué.";
+  
+  const picker = document.getElementById("rewards-picker");
+  picker.innerHTML = `
+    <button id="end-turn-btn" style="padding:14px 32px; font-size:16px; background:#b91c1c;" onclick="location.reload()">
+      Réessayer la mission
+    </button>
+  `;
+}
+
 function playCard(idx) {
+  if (isGameOver) return;
   const card = state.hand[idx];
   if (!card || state.player.chakra < card.cost) return;
 
   state.player.chakra -= card.cost;
 
-  // Effets sonores thématiques selon la carte jouée
-  if (card.type === "kyubi") {
-    AudioEngine.play("kyubi");
-  } else if (card.shield > 0) {
-    AudioEngine.play("block");
-  } else if (card.clones > 0) {
-    AudioEngine.play("clone");
-  } else {
-    AudioEngine.play("hit");
-  }
+  if (card.type === "kyubi") AudioEngine.play("kyubi");
+  else if (card.shield > 0) AudioEngine.play("block");
+  else if (card.clones > 0) AudioEngine.play("clone");
+  else AudioEngine.play("hit");
 
   if (card.selfDmg) {
-    state.player.hp = Math.max(1, state.player.hp - card.selfDmg);
+    state.player.hp = Math.max(0, state.player.hp - card.selfDmg);
     triggerShake("naruto-box");
     if (activeRelic && activeRelic.onDamage) activeRelic.onDamage(state);
+    if (checkPlayerDeath()) return;
   }
+
   if (card.chakraGain) state.player.chakra += card.chakraGain;
   if (card.shield) state.player.shield += card.shield;
   if (card.clones) {
@@ -257,7 +282,7 @@ function dealDamageToEnemy(amt) {
 }
 
 function endTurn() {
-  if (state.enemy.hp <= 0) return;
+  if (isGameOver || state.enemy.hp <= 0) return;
 
   // Attaque des clones
   if (state.player.clones > 0) {
@@ -279,8 +304,10 @@ function endTurn() {
   if (move.multiHit) {
     for (let i = 0; i < move.multiHit; i++) {
       setTimeout(() => {
-        hitPlayer(move.hitDmg);
-        AudioEngine.play("slash");
+        if (!isGameOver) {
+          hitPlayer(move.hitDmg);
+          AudioEngine.play("slash");
+        }
       }, i * 160);
     }
   } else if (move.dmg) {
@@ -300,11 +327,9 @@ function endTurn() {
     document.getElementById("log").innerText = "Grande Cataracte ! Tous tes clones sont balayés !";
   }
 
-  if (state.player.hp <= 0) {
-    document.getElementById("log").innerText = "Défaite... Mission échouée au Pays des Vagues.";
-    return;
-  }
+  if (checkPlayerDeath()) return;
 
+  // Reset début de nouveau tour
   state.player.shield = 0;
   state.player.chakra = state.player.maxChakra;
   state.enemy.turnCount++;
@@ -325,11 +350,14 @@ function hitPlayer(amt) {
     state.player.hp = Math.max(0, state.player.hp - amt);
     if (activeRelic && activeRelic.onDamage) activeRelic.onDamage(state);
   }
+  checkPlayerDeath();
 }
 
 function renderHand() {
   const h = document.getElementById("hand");
   h.innerHTML = "";
+  if (isGameOver) return;
+
   state.hand.forEach((card, i) => {
     const el = document.createElement("div");
     el.className = `card card-${card.type}`;
@@ -348,11 +376,11 @@ function renderHand() {
 
 function updateUI() {
   document.getElementById("player-hp-txt").innerText = `${state.player.hp} / ${state.player.maxHp} PV`;
-  document.getElementById("player-hp-bar").style.width = `${(state.player.hp / state.player.maxHp) * 100}%`;
+  document.getElementById("player-hp-bar").style.width = `${Math.max(0, (state.player.hp / state.player.maxHp) * 100)}%`;
   document.getElementById("player-shield").innerText = `Bouclier : ${state.player.shield}`;
 
   document.getElementById("enemy-hp-txt").innerText = `${state.enemy.hp} / ${state.enemy.maxHp} PV`;
-  document.getElementById("enemy-hp-bar").style.width = `${(state.enemy.hp / state.enemy.maxHp) * 100}%`;
+  document.getElementById("enemy-hp-bar").style.width = `${Math.max(0, (state.enemy.hp / state.enemy.maxHp) * 100)}%`;
   document.getElementById("enemy-shield").innerText = `Bouclier : ${state.enemy.shield}`;
   document.getElementById("chakra-display").innerText = `Chakra : ${state.player.chakra} / ${state.player.maxChakra}`;
 
@@ -366,7 +394,7 @@ function updateCounters() {
   document.getElementById("deck-info").innerText = `Pioche : ${state.deck.length} | Défausse : ${state.discard.length}`;
 }
 
-// --- GESTION DU REPOS ET AMÉLIORATION DE CARTES ---
+// --- FEU DE CAMP & AMÉLIORATIONS ---
 function openRestSite() {
   document.getElementById("rest-screen").style.display = "flex";
   document.getElementById("rest-choices").style.display = "flex";
@@ -379,7 +407,7 @@ function takeRest() {
   AudioEngine.play("kyubi");
   document.getElementById("rest-screen").style.display = "none";
   updateUI();
-  loadStage(3); // Passe au combat 4 (Boss Zabuza)
+  loadStage(3); // Passage au Boss Final Zabuza
 }
 
 function openUpgradePicker() {
@@ -388,7 +416,6 @@ function openUpgradePicker() {
   picker.style.display = "flex";
   picker.innerHTML = "";
 
-  // Filtrer les cartes éligibles non encore améliorées
   const upgradable = state.deck.filter(c => !c.upgraded && (c.name === "Coup de Poing" || c.name === "Kawarimi" || c.name === "Kage Bunshin"));
 
   if (upgradable.length === 0) {
@@ -397,7 +424,7 @@ function openUpgradePicker() {
     return;
   }
 
-  upgradable.forEach((card, idx) => {
+  upgradable.forEach((card) => {
     const el = document.createElement("div");
     el.className = `card card-${card.type}`;
     el.style.transform = "scale(1.05)";
@@ -420,7 +447,7 @@ function openUpgradePicker() {
       upgradeCard(card);
       AudioEngine.play("block");
       document.getElementById("rest-screen").style.display = "none";
-      loadStage(3); // Passe au Boss Zabuza
+      loadStage(3);
     };
     picker.appendChild(el);
   });
@@ -441,24 +468,26 @@ function upgradeCard(cardRef) {
   }
 }
 
-// --- MISE À JOUR DE LA VICTOIRE D'ÉTAPE ---
+// --- VICTOIRE D'ÉTAPE ---
 function handleStageVictory() {
   const overlay = document.getElementById("overlay");
   overlay.style.display = "flex";
   const picker = document.getElementById("rewards-picker");
   picker.innerHTML = "";
 
-  // Victoire Boss Final
+  // Victoire Zabuza
   if (currentStageIndex === STAGES.length - 1) {
     document.getElementById("overlay-title").innerText = "VICTOIRE TOTALE SUR LE PAYS DES VAGUES !";
+    document.getElementById("overlay-title").style.color = "#f59e0b";
     document.getElementById("overlay-sub").innerText = "Le grand pont Naruto est achevé. Zabuza a été vaincu !";
     picker.innerHTML = `<button id="end-turn-btn" style="padding:14px 30px; font-size:16px;" onclick="location.reload()">Recommencer la campagne</button>`;
     return;
   }
 
-  // Victoire sur Haku (Étape 2, index 2) : Choix de la Relique PUIS direction Feu de Camp
+  // Victoire Haku -> Choix Relique -> Feu de camp
   if (currentStageIndex === 2) {
     document.getElementById("overlay-title").innerText = "VICTOIRE ÉLITE SUR HAKU !";
+    document.getElementById("overlay-title").style.color = "#f59e0b";
     document.getElementById("overlay-sub").innerText = "Choisis un trésor ninja légendaire (Relique passive) :";
     
     RELICS_POOL.forEach(relic => {
@@ -476,15 +505,16 @@ function handleStageVictory() {
         if (relic.apply) relic.apply(state);
         document.getElementById("relics-bar").innerText = `Relique : ${relic.name}`;
         overlay.style.display = "none";
-        openRestSite(); // Déclenche le feu de camp chez Tazuna !
+        openRestSite();
       };
       picker.appendChild(el);
     });
     return;
   }
 
-  // Étapes 1 et 2 (Brigands et Frères Démons)
+  // Victoires classiques (1 et 2)
   document.getElementById("overlay-title").innerText = `Victoire sur ${STAGES[currentStageIndex].name} !`;
+  document.getElementById("overlay-title").style.color = "#f59e0b";
   document.getElementById("overlay-sub").innerText = "Choisis une technique pour renforcer ton deck :";
 
   REWARD_OPTIONS.forEach(reward => {
