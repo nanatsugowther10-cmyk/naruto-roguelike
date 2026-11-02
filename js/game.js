@@ -319,12 +319,13 @@ function playCard(idx) {
   }
 
   if (dmg > 0) {
-    if (state.enemy.mist && state.player.clones < 2 && Math.random() < 0.5) {
-      document.getElementById("log").innerText = "Attaque ratée dans le brouillard !";
-    } else {
-      dealDamageToEnemy(dmg);
-    }
+  if (state.enemy.mist && state.player.clones < 2 && Math.random() < 0.5) {
+    document.getElementById("log").innerText = "Attaque ratée dans le brouillard !";
+    spawnFloatingText("enemy-box", "RATE !", "miss");
+  } else {
+    dealDamageToEnemy(dmg);
   }
+}
 
   state.discard.push(state.hand.splice(idx, 1)[0]);
   updateUI();
