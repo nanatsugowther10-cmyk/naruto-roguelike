@@ -9,27 +9,53 @@
 
   <div id="mist-overlay"></div>
 
+  <!-- BARRE SUPÉRIEURE UNIQUE & ÉPURÉE -->
   <div id="top-bar">
-    <div id="top-bar">
+    <!-- 1. Gauche : Frise de progression -->
     <div id="node-map">
-      <div class="node" id="node-0"><span class="node-icon">⚓</span><span class="node-label">Port</span></div>
-      <div class="node-line"></div>
-      <div class="node" id="node-1"><span class="node-icon">🌲</span><span class="node-label">Marais</span></div>
-      <div class="node-line"></div>
-      <div class="node" id="node-2"><span class="node-icon">❄️</span><span class="node-label">Haku</span></div>
-      <div class="node-line"></div>
-      <div class="node" id="node-3"><span class="node-icon">🍜</span><span class="node-label">Tazuna</span></div>
-      <div class="node-line"></div>
-      <div class="node" id="node-4"><span class="node-icon">🌉</span><span class="node-label">Zabuza</span></div>
-    </div>
-    <span id="relics-bar">Relique : Aucune</span>
-    <div id="top-bar-right" style="display:flex; align-items:center; gap:12px;">
-      <div id="deck-info">
-        <button id="btn-inspect-draw" class="pile-btn" onclick="openInspector('deck')">🎴 Pioche : <span id="draw-count">0</span></button>
-        <span class="pile-separator">|</span>
-        <button id="btn-inspect-discard" class="pile-btn" onclick="openInspector('discard')">🗑️ Défausse : <span id="discard-count">0</span></button>
+      <div class="node active" id="node-0">
+        <span class="node-icon">⚓</span>
+        <span class="node-label">Port</span>
       </div>
-      <button class="pile-btn" onclick="openSettingsModal()">⚙️ Options</button>
+      <div class="node-line"></div>
+      <div class="node" id="node-1">
+        <span class="node-icon">🌲</span>
+        <span class="node-label">Marais</span>
+      </div>
+      <div class="node-line"></div>
+      <div class="node" id="node-2">
+        <span class="node-icon">❄️</span>
+        <span class="node-label">Haku</span>
+      </div>
+      <div class="node-line"></div>
+      <div class="node" id="node-3">
+        <span class="node-icon">🍜</span>
+        <span class="node-label">Tazuna</span>
+      </div>
+      <div class="node-line"></div>
+      <div class="node" id="node-4">
+        <span class="node-icon">🌉</span>
+        <span class="node-label">Zabuza</span>
+      </div>
+    </div>
+
+    <!-- 2. Centre : Titre de mission et Reliques -->
+    <div id="top-bar-center">
+      <span id="relics-bar">Relique : Aucune</span>
+    </div>
+
+    <!-- 3. Droite : Pioche, Défausse & Options -->
+    <div id="top-bar-right">
+      <div id="deck-info">
+        <button id="btn-inspect-draw" class="pile-btn" onclick="openInspector('deck')">
+          🎴 Pioche : <span id="draw-count">0</span>
+        </button>
+        <span class="pile-separator">|</span>
+        <button id="btn-inspect-discard" class="pile-btn" onclick="openInspector('discard')">
+          🗑️ Défausse : <span id="discard-count">0</span>
+        </button>
+      </div>
+      <button class="pile-btn btn-settings" onclick="openSettingsModal()">⚙️ Options</button>
     </div>
   </div>
     <div id="node-map">
