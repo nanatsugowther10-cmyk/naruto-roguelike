@@ -1,11 +1,21 @@
-// --- CHARGEUR D'IMAGES INTELLIGENT (Résout la racine, assets/ ou assets/characters/ et assets/cards/) ---
+// --- CACHE & PRÉCHARGEMENT D'IMAGES INSTANTANÉ ---
+const resolvedPathCache = {};
+
 function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
   if (!originalPath) return;
   const filename = originalPath.split('/').pop();
+
+  // Si le bon chemin a déjà été trouvé auparavant, on l'applique immédiatement (0 ms de délai)
+  if (resolvedPathCache[filename]) {
+    imgElement.src = resolvedPathCache[filename];
+    return;
+  }
+
+  // Ordre de priorité intelligent : dossier spécifique, puis assets/, puis racine
   const candidatePaths = [
     originalPath,
-    `assets/characters/${filename}`,
     `assets/cards/${filename}`,
+    `assets/characters/${filename}`,
     `assets/${filename}`,
     filename
   ];
@@ -13,6 +23,11 @@ function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
   let idx = 0;
 
   imgElement.src = uniquePaths[0];
+
+  imgElement.onload = function() {
+    resolvedPathCache[filename] = imgElement.src;
+  };
+
   imgElement.onerror = function() {
     idx++;
     if (idx < uniquePaths.length) {
@@ -118,8 +133,23 @@ const state = {
   discard: []
 };
 
+// Précharge toutes les images en cache navigateur dès l'ouverture
+function preloadAllAssets() {
+  const imagesToPreload = [
+    "naruto.png", "brigand.png", "freres_demons.png", "haku.png", "zabuza.png",
+    "card_poing.png", "card_kawarimi.png", "card_clones.png", "card_rendan.png", "card_kyubi.png"
+  ];
+
+  imagesToPreload.forEach(name => {
+    const dummyImg = new Image();
+    resolveImgSrc(dummyImg, name);
+  });
+}
+
 function initGame() {
   isGameOver = false;
+  preloadAllAssets();
+
   state.deck = [
     { ...CARDS_POOL[0] }, { ...CARDS_POOL[0] }, { ...CARDS_POOL[0] },
     { ...CARDS_POOL[1] }, { ...CARDS_POOL[1] }, { ...CARDS_POOL[1] },
@@ -128,7 +158,6 @@ function initGame() {
     { ...CARDS_POOL[4] }
   ];
 
-  // Chargement garanti du sprite de Naruto
   const narutoImg = document.getElementById("naruto-img");
   resolveImgSrc(narutoImg, "naruto.png");
 
