@@ -1,6 +1,20 @@
 // --- CACHE & PRÉCHARGEMENT D'IMAGES INSTANTANÉ ---
 const resolvedPathCache = {};
 
+function updateNodeMap(currentIndex) {
+  for (let i = 0; i <= 4; i++) {
+    const nodeEl = document.getElementById(`node-${i}`);
+    if (!nodeEl) continue;
+    nodeEl.classList.remove("active", "completed");
+
+    if (i < currentIndex) {
+      nodeEl.classList.add("completed");
+    } else if (i === currentIndex) {
+      nodeEl.classList.add("active");
+    }
+  }
+}
+
 // Fonction pour faire jaillir le texte animé
 function spawnFloatingText(targetBoxId, text, type = "damage") {
   const box = document.getElementById(targetBoxId);
@@ -185,6 +199,7 @@ function initGame() {
 function loadStage(index) {
   currentStageIndex = index;
   const stage = STAGES[index];
+  updateNodeMap(index);
 
   document.body.className = stage.bgClass;
   document.getElementById("stage-title").innerText = stage.title;
@@ -486,6 +501,7 @@ function updateCounters() {
 
 // --- FEU DE CAMP & AMÉLIORATION DE CARTES ---
 function openRestSite() {
+  updateNodeMap(3);
   document.getElementById("rest-screen").style.display = "flex";
   document.getElementById("rest-choices").style.display = "flex";
   document.getElementById("upgrade-picker").style.display = "none";
