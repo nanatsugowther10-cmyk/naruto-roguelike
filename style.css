@@ -391,6 +391,82 @@ body.stage-bg-4 #mist-overlay {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
 }
 
+/* --- ANIMATIONS DE DÉPLACEMENT (RUSH AVANT/ARRIÈRE) --- */
+@keyframes rush-forward-player {
+  0% { transform: translateX(0); }
+  35% { transform: translateX(90px) scale(1.08); }
+  100% { transform: translateX(0) scale(1); }
+}
+.player-rush {
+  animation: rush-forward-player 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes rush-forward-enemy {
+  0% { transform: translateX(0); }
+  35% { transform: translateX(-90px) scale(1.08); }
+  100% { transform: translateX(0) scale(1); }
+}
+.enemy-rush {
+  animation: rush-forward-enemy 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* --- EFFETS VISUELS (VFX) --- */
+/* Trait de coupe / Slash blanc-rouge */
+.vfx-slash {
+  position: absolute;
+  top: 30%;
+  left: 20%;
+  width: 140px;
+  height: 6px;
+  background: linear-gradient(90deg, transparent, #ffffff, #ef4444, transparent);
+  box-shadow: 0 0 14px #ef4444;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 55;
+  transform: rotate(-45deg) scaleX(0);
+  animation: vfx-slash-anim 0.25s ease-out forwards;
+}
+@keyframes vfx-slash-anim {
+  0% { transform: rotate(-45deg) scaleX(0); opacity: 1; }
+  50% { transform: rotate(-45deg) scaleX(1.4); opacity: 1; }
+  100% { transform: rotate(-45deg) scaleX(1.6); opacity: 0; }
+}
+
+/* Nuage de fumée d'invocation (Kawarimi, Clones) */
+.vfx-smoke {
+  position: absolute;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.3);
+  font-size: 55px;
+  pointer-events: none;
+  z-index: 55;
+  opacity: 1;
+  filter: drop-shadow(0 0 12px rgba(255,255,255,0.7));
+  animation: vfx-smoke-anim 0.45s ease-out forwards;
+}
+@keyframes vfx-smoke-anim {
+  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0.9; }
+  60% { transform: translate(-50%, -65%) scale(1.6); opacity: 0.8; }
+  100% { transform: translate(-50%, -80%) scale(2); opacity: 0; }
+}
+
+/* Shuriken volant traversant l'écran */
+.vfx-projectile {
+  position: absolute;
+  bottom: 120px;
+  left: 220px;
+  font-size: 38px;
+  pointer-events: none;
+  z-index: 50;
+  animation: vfx-throw 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+@keyframes vfx-throw {
+  0% { left: 240px; transform: rotate(0deg) scale(0.8); opacity: 1; }
+  80% { opacity: 1; }
+  100% { left: calc(100% - 320px); transform: rotate(720deg) scale(1.3); opacity: 0; }
+}
+
 .float-damage { color: #ef4444; }   /* Dégâts directs aux PV */
 .float-shield { color: #38bdf8; }   /* Dégâts absorbés par le bouclier */
 .float-heal   { color: #22c55e; }   /* Soins (Ramen) */
