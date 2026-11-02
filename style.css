@@ -296,6 +296,101 @@ body.stage-bg-4 #mist-overlay {
   }
 }
 
+/* Boutons Pioche et Défausse */
+#deck-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pile-btn {
+  background: rgba(22, 27, 34, 0.8);
+  border: 1px solid #30363d;
+  color: #f0f6fc;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pile-btn:hover {
+  background: #30363d;
+  border-color: #38bdf8;
+  color: #38bdf8;
+  transform: translateY(-1px);
+}
+.pile-separator {
+  color: #484f58;
+}
+
+/* Modale Inspecteur */
+#inspector-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 7, 12, 0.85);
+  backdrop-filter: blur(6px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+}
+.inspector-box {
+  background: #0d1117;
+  border: 2px solid #30363d;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 860px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8);
+}
+.inspector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #21262d;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+#inspector-title {
+  color: #f59e0b;
+  font-size: 20px;
+  font-weight: 700;
+}
+.inspector-close-btn {
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  font-size: 22px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.inspector-close-btn:hover {
+  color: #ef4444;
+}
+
+/* Grille des cartes inspectées */
+#inspector-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 10px;
+}
+#inspector-grid .card {
+  cursor: default;
+}
+#inspector-grid .card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
 .float-damage { color: #ef4444; }   /* Dégâts directs aux PV */
 .float-shield { color: #38bdf8; }   /* Dégâts absorbés par le bouclier */
 .float-heal   { color: #22c55e; }   /* Soins (Ramen) */
