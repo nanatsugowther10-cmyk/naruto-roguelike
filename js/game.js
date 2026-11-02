@@ -293,17 +293,69 @@ function checkPlayerDeath() {
   return false;
 }
 
+// Déclenche l'animation d'avancée/recul d'un combattant
+function triggerRush(fighterBoxId, isPlayer = true) {
+  const box = document.getElementById(fighterBoxId);
+  if (!box) return;
+  const animClass = isPlayer ? "player-rush" : "enemy-rush";
+  box.classList.remove(animClass);
+  void box.offsetWidth;
+  box.classList.add(animClass);
+}
+
+// Fait apparaître un effet visuel (Slash, Fumée, Projectile)
+function spawnVFX(type, targetBoxId = "enemy-box") {
+  const targetBox = document.getElementById(targetBoxId);
+  const combatZone = document.getElementById("combat-zone");
+
+  if (type === "slash" && targetBox) {
+    const el = document.createElement("div");
+    el.className = "vfx-slash";
+    targetBox.appendChild(el);
+    setTimeout(() => el.remove(), 260);
+  } else if (type === "smoke" && targetBox) {
+    const el = document.createElement("div");
+    el.className = "vfx-smoke";
+    el.innerText = "💨";
+    targetBox.appendChild(el);
+    setTimeout(() => el.remove(), 460);
+  } else if (type === "fuma" && combatZone) {
+    const el = document.createElement("div");
+    el.className = "vfx-projectile";
+    el.innerText = "⚔️";
+    combatZone.appendChild(el);
+    setTimeout(() => el.remove(), 310);
+  }
+}
+
 function playCard(idx) {
-  if (isGameOver || busy || state.enemy.hp <= 0) return;
+  if (isGameOver) return;
   const card = state.hand[idx];
   if (!card || state.player.chakra < card.cost) return;
 
   state.player.chakra -= card.cost;
 
-  if (card.type === "kyubi") AudioEngine.play("kyubi");
-  else if (card.shield > 0) AudioEngine.play("block");
-  else if (card.clones > 0) AudioEngine.play("clone");
-  else AudioEngine.play("hit");
+  // VFX et Audio selon le type d'action
+  if (card.type === "kyubi") {
+    AudioEngine.play("kyubi");
+    triggerRush("naruto-box", true);
+    spawnVFX("slash", "enemy-box");
+  } else if (card.shield > 0) {
+    AudioEngine.play("block");
+    spawnVFX("smoke", "naruto-box");
+  } else if (card.clones > 0) {
+    AudioEngine.play("clone");
+    spawnVFX("smoke", "naruto-box");
+  } else if (card.name.includes("Fûma")) {
+    AudioEngine.play("slash");
+    triggerRush("naruto-box", true);
+    spawnVFX("fuma");
+  } else {
+    // Attaque physique normale (Coup de Poing, Naruto Rendan, Combo 2000)
+    AudioEngine.play("hit");
+    triggerRush("naruto-box", true);
+    spawnVFX("slash", "enemy-box");
+  }
 
   if (card.selfDmg) {
     state.player.hp = Math.max(0, state.player.hp - card.selfDmg);
@@ -337,13 +389,13 @@ function playCard(idx) {
   }
 
   if (dmg > 0) {
-  if (state.enemy.mist && state.player.clones < 2 && Math.random() < 0.5) {
-    document.getElementById("log").innerText = "Attaque ratée dans le brouillard !";
-    spawnFloatingText("enemy-box", "RATE !", "miss");
-  } else {
-    dealDamageToEnemy(dmg);
+    if (state.enemy.mist && state.player.clones < 2 && Math.random() < 0.5) {
+      document.getElementById("log").innerText = "Attaque ratée dans le brouillard !";
+      spawnFloatingText("enemy-box", "RATÉ !", "miss");
+    } else {
+      dealDamageToEnemy(dmg);
+    }
   }
-}
 
   state.discard.push(state.hand.splice(idx, 1)[0]);
   updateUI();
@@ -398,12 +450,17 @@ function endTurn() {
     state.enemy.shield += move.shield;
     AudioEngine.play("block");
   }
+// Déclenche l'avancée de l'ennemi s'il prépare une attaque
+  if (hits.length > 0) {
+    triggerRush("enemy-box", false);
+  }
 
   // Liste des coups à encaisser (les multi-coups sont espacés dans le temps)
   const hits = move.multiHit ? Array(move.multiHit).fill(move.hitDmg) : (move.dmg ? [move.dmg] : []);
   hits.forEach((d, i) => {
     setTimeout(() => {
       if (isGameOver) return;
+      spawnVFX("slash", "naruto-box");
       hitPlayer(d);
       AudioEngine.play("slash");
     }, i * 160);
