@@ -450,13 +450,16 @@ function endTurn() {
     state.enemy.shield += move.shield;
     AudioEngine.play("block");
   }
-// Déclenche l'avancée de l'ennemi s'il prépare une attaque
+
+  const hits = move.multiHit ? Array(move.multiHit).fill(move.hitDmg) : (move.dmg ? [move.dmg] : []);
+
+  // 1. L'ennemi s'élance vers Naruto s'il porte au moins un coup
   if (hits.length > 0) {
     triggerRush("enemy-box", false);
   }
 
-  // Liste des coups à encaisser (les multi-coups sont espacés dans le temps)
-  const hits = move.multiHit ? Array(move.multiHit).fill(move.hitDmg) : (move.dmg ? [move.dmg] : []);
+  // 2. Traitement des impacts et des taillades (VFX)
+  const totalAnimTime = hits.length * 160;
   hits.forEach((d, i) => {
     setTimeout(() => {
       if (isGameOver) return;
@@ -466,8 +469,26 @@ function endTurn() {
     }, i * 160);
   });
 
-  // La fin du tour n'a lieu qu'APRÈS le dernier coup (sinon le bouclier est remis à 0 trop tôt)
-  setTimeout(() => finishEnemyTurn(move), hits.length * 160 + 60);
+  // 3. Clôture du tour après la fin de toutes les frappes
+  setTimeout(() => {
+    if (isGameOver) { busy = false; return; }
+
+    state.enemy.mist = !!move.mist;
+    if (move.clearClones) {
+      state.player.clones = 0;
+      renderClones();
+      spawnVFX("smoke", "naruto-box");
+      AudioEngine.play("clone");
+      document.getElementById("log").innerText = "Grande Cataracte ! Tous tes clones sont balayés !";
+    }
+
+    state.player.shield = 0;
+    state.player.chakra = state.player.maxChakra;
+    state.enemy.turnCount++;
+    drawCards(4);
+    updateUI();
+    busy = false;
+  }, Math.max(totalAnimTime, 100));
 }
 
 function finishEnemyTurn(move) {
