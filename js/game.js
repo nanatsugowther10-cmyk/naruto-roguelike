@@ -366,12 +366,89 @@ function updateCounters() {
   document.getElementById("deck-info").innerText = `Pioche : ${state.deck.length} | Défausse : ${state.discard.length}`;
 }
 
+// --- GESTION DU REPOS ET AMÉLIORATION DE CARTES ---
+function openRestSite() {
+  document.getElementById("rest-screen").style.display = "flex";
+  document.getElementById("rest-choices").style.display = "flex";
+  document.getElementById("upgrade-picker").style.display = "none";
+}
+
+function takeRest() {
+  const healAmount = 25;
+  state.player.hp = Math.min(state.player.maxHp, state.player.hp + healAmount);
+  AudioEngine.play("kyubi");
+  document.getElementById("rest-screen").style.display = "none";
+  updateUI();
+  loadStage(3); // Passe au combat 4 (Boss Zabuza)
+}
+
+function openUpgradePicker() {
+  document.getElementById("rest-choices").style.display = "none";
+  const picker = document.getElementById("upgrade-picker");
+  picker.style.display = "flex";
+  picker.innerHTML = "";
+
+  // Filtrer les cartes éligibles non encore améliorées
+  const upgradable = state.deck.filter(c => !c.upgraded && (c.name === "Coup de Poing" || c.name === "Kawarimi" || c.name === "Kage Bunshin"));
+
+  if (upgradable.length === 0) {
+    picker.innerHTML = `<p style="color:#ef4444;">Toutes tes cartes de base sont déjà améliorées !</p>`;
+    setTimeout(() => { takeRest(); }, 1200);
+    return;
+  }
+
+  upgradable.forEach((card, idx) => {
+    const el = document.createElement("div");
+    el.className = `card card-${card.type}`;
+    el.style.transform = "scale(1.05)";
+    
+    let previewDesc = "";
+    if (card.name === "Coup de Poing") previewDesc = "Passe à 10 dégâts.";
+    if (card.name === "Kawarimi") previewDesc = "Passe à 10 de bouclier.";
+    if (card.name === "Kage Bunshin") previewDesc = "Coût réduit à 1 Chakra !";
+
+    el.innerHTML = `
+      <div class="card-top">
+        <span class="card-title">${card.name}+</span>
+        <span class="card-cost">${card.name === "Kage Bunshin" ? 1 : card.cost}</span>
+      </div>
+      <div class="card-desc" style="color:#38bdf8;">${previewDesc}</div>
+      <div class="card-tag">Amélioration</div>
+    `;
+
+    el.onclick = () => {
+      upgradeCard(card);
+      AudioEngine.play("block");
+      document.getElementById("rest-screen").style.display = "none";
+      loadStage(3); // Passe au Boss Zabuza
+    };
+    picker.appendChild(el);
+  });
+}
+
+function upgradeCard(cardRef) {
+  cardRef.upgraded = true;
+  cardRef.name = `${cardRef.name}+`;
+  if (cardRef.name.startsWith("Coup de Poing")) {
+    cardRef.dmg = 10;
+    cardRef.desc = "Inflige 10 dégâts physiques renforcés.";
+  } else if (cardRef.name.startsWith("Kawarimi")) {
+    cardRef.shield = 10;
+    cardRef.desc = "Substitution parfaite (+10 bouclier).";
+  } else if (cardRef.name.startsWith("Kage Bunshin")) {
+    cardRef.cost = 1;
+    cardRef.desc = "+2 Clones (+3 dégâts chacun). Coût réduit.";
+  }
+}
+
+// --- MISE À JOUR DE LA VICTOIRE D'ÉTAPE ---
 function handleStageVictory() {
   const overlay = document.getElementById("overlay");
   overlay.style.display = "flex";
   const picker = document.getElementById("rewards-picker");
   picker.innerHTML = "";
 
+  // Victoire Boss Final
   if (currentStageIndex === STAGES.length - 1) {
     document.getElementById("overlay-title").innerText = "VICTOIRE TOTALE SUR LE PAYS DES VAGUES !";
     document.getElementById("overlay-sub").innerText = "Le grand pont Naruto est achevé. Zabuza a été vaincu !";
@@ -379,6 +456,7 @@ function handleStageVictory() {
     return;
   }
 
+  // Victoire sur Haku (Étape 2, index 2) : Choix de la Relique PUIS direction Feu de Camp
   if (currentStageIndex === 2) {
     document.getElementById("overlay-title").innerText = "VICTOIRE ÉLITE SUR HAKU !";
     document.getElementById("overlay-sub").innerText = "Choisis un trésor ninja légendaire (Relique passive) :";
@@ -398,13 +476,14 @@ function handleStageVictory() {
         if (relic.apply) relic.apply(state);
         document.getElementById("relics-bar").innerText = `Relique : ${relic.name}`;
         overlay.style.display = "none";
-        loadStage(currentStageIndex + 1);
+        openRestSite(); // Déclenche le feu de camp chez Tazuna !
       };
       picker.appendChild(el);
     });
     return;
   }
 
+  // Étapes 1 et 2 (Brigands et Frères Démons)
   document.getElementById("overlay-title").innerText = `Victoire sur ${STAGES[currentStageIndex].name} !`;
   document.getElementById("overlay-sub").innerText = "Choisis une technique pour renforcer ton deck :";
 
