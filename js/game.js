@@ -156,6 +156,7 @@ const AudioEngine = {
 let currentStageIndex = 0;
 let activeRelic = null;
 let isGameOver = false;
+let busy = false; // true pendant le tour de l'ennemi
 
 const state = {
   player: { hp: 60, maxHp: 60, shield: 0, chakra: 3, maxChakra: 3, clones: 0, willOfFire: false },
@@ -197,12 +198,14 @@ function initGame() {
 }
 
 function loadStage(index) {
+  busy = false;
   currentStageIndex = index;
   const stage = STAGES[index];
-  updateNodeMap(index);
+  updateNodeMap(index >= 3 ? index + 1 : index);
 
   document.body.className = stage.bgClass;
-  document.getElementById("stage-title").innerText = stage.title;
+  const titleEl = document.getElementById("stage-title");
+  if (titleEl) titleEl.innerText = stage.title;
 
   state.enemy.hp = stage.maxHp;
   state.enemy.maxHp = stage.maxHp;
@@ -291,7 +294,7 @@ function checkPlayerDeath() {
 }
 
 function playCard(idx) {
-  if (isGameOver) return;
+  if (isGameOver || busy || state.enemy.hp <= 0) return;
   const card = state.hand[idx];
   if (!card || state.player.chakra < card.cost) return;
 
@@ -373,7 +376,8 @@ function dealDamageToEnemy(amt) {
 }
 
 function endTurn() {
-  if (isGameOver || state.enemy.hp <= 0) return;
+  if (isGameOver || busy || state.enemy.hp <= 0) return;
+  busy = true;
 
   if (state.player.clones > 0) {
     const cDmg = state.player.clones * 3;
@@ -385,29 +389,33 @@ function endTurn() {
   while (state.hand.length > 0) state.discard.push(state.hand.pop());
   renderHand();
 
-  if (state.enemy.hp <= 0) { handleStageVictory(); return; }
+  if (state.enemy.hp <= 0) { busy = false; updateUI(); handleStageVictory(); return; }
 
   const stage = STAGES[currentStageIndex];
   const move = stage.pattern[(state.enemy.turnCount - 1) % stage.pattern.length];
-
-  if (move.multiHit) {
-    for (let i = 0; i < move.multiHit; i++) {
-      setTimeout(() => {
-        if (!isGameOver) {
-          hitPlayer(move.hitDmg);
-          AudioEngine.play("slash");
-        }
-      }, i * 160);
-    }
-  } else if (move.dmg) {
-    hitPlayer(move.dmg);
-    AudioEngine.play("slash");
-  }
 
   if (move.shield) {
     state.enemy.shield += move.shield;
     AudioEngine.play("block");
   }
+
+  // Liste des coups à encaisser (les multi-coups sont espacés dans le temps)
+  const hits = move.multiHit ? Array(move.multiHit).fill(move.hitDmg) : (move.dmg ? [move.dmg] : []);
+  hits.forEach((d, i) => {
+    setTimeout(() => {
+      if (isGameOver) return;
+      hitPlayer(d);
+      AudioEngine.play("slash");
+    }, i * 160);
+  });
+
+  // La fin du tour n'a lieu qu'APRÈS le dernier coup (sinon le bouclier est remis à 0 trop tôt)
+  setTimeout(() => finishEnemyTurn(move), hits.length * 160 + 60);
+}
+
+function finishEnemyTurn(move) {
+  if (isGameOver) return;
+
   state.enemy.mist = !!move.mist;
   if (move.clearClones) {
     state.player.clones = 0;
@@ -416,13 +424,12 @@ function endTurn() {
     document.getElementById("log").innerText = "Grande Cataracte ! Tous tes clones sont balayés !";
   }
 
-  if (checkPlayerDeath()) return;
-
   state.player.shield = 0;
   state.player.chakra = state.player.maxChakra;
   state.enemy.turnCount++;
   drawCards(4);
   updateUI();
+  busy = false;
 }
 
 function hitPlayer(amt) {
@@ -490,7 +497,7 @@ function updateUI() {
   document.getElementById("chakra-display").innerText = `Chakra : ${state.player.chakra} / ${state.player.maxChakra}`;
 
   const stage = STAGES[currentStageIndex];
-  const nextMove = stage.pattern[state.enemy.turnCount % stage.pattern.length];
+  const nextMove = stage.pattern[(state.enemy.turnCount - 1) % stage.pattern.length];
   document.getElementById("enemy-intent").innerText = `Prépare : ${nextMove.intent}`;
   updateCounters();
 }
