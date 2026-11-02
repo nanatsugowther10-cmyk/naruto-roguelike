@@ -10,6 +10,28 @@
   <div id="mist-overlay"></div>
 
   <div id="top-bar">
+    <div id="top-bar">
+    <div id="node-map">
+      <div class="node" id="node-0"><span class="node-icon">⚓</span><span class="node-label">Port</span></div>
+      <div class="node-line"></div>
+      <div class="node" id="node-1"><span class="node-icon">🌲</span><span class="node-label">Marais</span></div>
+      <div class="node-line"></div>
+      <div class="node" id="node-2"><span class="node-icon">❄️</span><span class="node-label">Haku</span></div>
+      <div class="node-line"></div>
+      <div class="node" id="node-3"><span class="node-icon">🍜</span><span class="node-label">Tazuna</span></div>
+      <div class="node-line"></div>
+      <div class="node" id="node-4"><span class="node-icon">🌉</span><span class="node-label">Zabuza</span></div>
+    </div>
+    <span id="relics-bar">Relique : Aucune</span>
+    <div id="top-bar-right" style="display:flex; align-items:center; gap:12px;">
+      <div id="deck-info">
+        <button id="btn-inspect-draw" class="pile-btn" onclick="openInspector('deck')">🎴 Pioche : <span id="draw-count">0</span></button>
+        <span class="pile-separator">|</span>
+        <button id="btn-inspect-discard" class="pile-btn" onclick="openInspector('discard')">🗑️ Défausse : <span id="discard-count">0</span></button>
+      </div>
+      <button class="pile-btn" onclick="openSettingsModal()">⚙️ Options</button>
+    </div>
+  </div>
     <div id="node-map">
       <div class="node completed" id="node-0">
         <span class="node-icon">⚓</span>
@@ -129,5 +151,66 @@
 
   <script src="js/data.js"></script>
   <script src="js/game.js"></script>
+<!-- Écran du Menu Principal -->
+  <div id="main-menu">
+    <div class="menu-content">
+      <h1 class="menu-title">NARUTO</h1>
+      <h2 class="menu-subtitle">CHRONIQUES DU PAYS DES VAGUES</h2>
+      
+      <div class="menu-buttons">
+        <button id="btn-continue" class="menu-btn" onclick="continueGame()" style="display: none;">Continuer la mission</button>
+        <button class="menu-btn primary-btn" onclick="startNewGamePrompt()">Nouvelle Partie</button>
+        <button class="menu-btn" onclick="openSettingsModal()">Options</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale des Paramètres / Options -->
+  <div id="settings-modal" onclick="closeSettingsModal(event)">
+    <div class="settings-box" onclick="event.stopPropagation()">
+      <div class="settings-header">
+        <h3>Paramètres du Jeu</h3>
+        <button class="inspector-close-btn" onclick="closeSettingsModal()">✕</button>
+      </div>
+
+      <div class="settings-body">
+        <div class="setting-group">
+          <label>Volume Général : <span id="val-vol-master">80%</span></label>
+          <input type="range" id="vol-master" min="0" max="1" step="0.05" value="0.8" oninput="updateAudioSettings()">
+        </div>
+
+        <div class="setting-group">
+          <label>Volume Musique : <span id="val-vol-music">40%</span></label>
+          <input type="range" id="vol-music" min="0" max="1" step="0.05" value="0.4" oninput="updateAudioSettings()">
+        </div>
+
+        <div class="setting-group">
+          <label>Volume Effets Sonores (SFX) : <span id="val-vol-sfx">80%</span></label>
+          <input type="range" id="vol-sfx" min="0" max="1" step="0.05" value="0.8" oninput="updateAudioSettings()">
+        </div>
+
+        <hr class="setting-divider">
+
+        <div class="setting-group">
+          <label>Taille des cartes : <span id="val-card-size">Normale (100%)</span></label>
+          <input type="range" id="card-size" min="0.85" max="1.25" step="0.05" value="1" oninput="updateDisplaySettings()">
+        </div>
+
+        <div class="setting-group">
+          <label>Taille du texte : <span id="val-font-size">Normale</span></label>
+          <select id="font-size-select" onchange="updateDisplaySettings()">
+            <option value="small">Compacte</option>
+            <option value="medium" selected>Normale</option>
+            <option value="large">Grande</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="menu-btn" style="padding: 8px 24px; font-size: 14px;" onclick="closeSettingsModal()">Fermer</button>
+      </div>
+    </div>
+  </div>
+  
 </body>
 </html>
