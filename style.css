@@ -197,3 +197,46 @@ body.stage-bg-4 #mist-overlay {
 .rest-title { font-size: 16px; font-weight: bold; color: #f59e0b; }
 .rest-desc { font-size: 12px; color: #a8a29e; line-height: 1.4; }
 #upgrade-picker { display: none; gap: 16px; flex-wrap: wrap; justify-content: center; max-width: 800px; margin-top: 25px; }
+
+/* Déclaration de la police Naruto */
+@font-face {
+  font-family: 'NinjaNaruto';
+  src: url('njnaruto.ttf') format('truetype'),
+       url('assets/njnaruto.ttf') format('truetype');
+}
+
+/* Chiffres et textes de combat flottants */
+.floating-text {
+  position: absolute;
+  font-family: 'NinjaNaruto', 'Segoe UI', sans-serif;
+  font-size: 32px;
+  letter-spacing: 1px;
+  pointer-events: none;
+  z-index: 60;
+  text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+  animation: floatCombatText 0.9s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+
+@keyframes floatCombatText {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 15px) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -10px) scale(1.25);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -35px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -60px) scale(0.85);
+  }
+}
+
+.float-damage { color: #ef4444; }   /* Dégâts directs aux PV */
+.float-shield { color: #38bdf8; }   /* Dégâts absorbés par le bouclier */
+.float-heal   { color: #22c55e; }   /* Soins (Ramen) */
+.float-miss   { color: #cbd5e1; }   /* Échec dans le brouillard */
