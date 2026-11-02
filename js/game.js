@@ -1,53 +1,21 @@
-// --- CACHE & PRÉCHARGEMENT D'IMAGES INSTANTANÉ ---
+// ==========================================
+// 1. GESTION DU CACHE & CHARGEUR D'IMAGES
+// ==========================================
 const resolvedPathCache = {};
-
-function updateNodeMap(currentIndex) {
-  for (let i = 0; i <= 4; i++) {
-    const nodeEl = document.getElementById(`node-${i}`);
-    if (!nodeEl) continue;
-    nodeEl.classList.remove("active", "completed");
-
-    if (i < currentIndex) {
-      nodeEl.classList.add("completed");
-    } else if (i === currentIndex) {
-      nodeEl.classList.add("active");
-    }
-  }
-}
-
-// Fonction pour faire jaillir le texte animé
-function spawnFloatingText(targetBoxId, text, type = "damage") {
-  const box = document.getElementById(targetBoxId);
-  if (!box) return;
-
-  const el = document.createElement("div");
-  el.className = `floating-text float-${type}`;
-  el.innerText = text;
-
-  // Décalage aléatoire léger pour ne pas superposer les frappes multiples
-  const randomX = Math.floor(Math.random() * 30) - 15;
-  el.style.left = `calc(50% + ${randomX}px)`;
-  el.style.top = "35%";
-
-  box.appendChild(el);
-  setTimeout(() => el.remove(), 900);
-}
 
 function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
   if (!originalPath) return;
   const filename = originalPath.split('/').pop();
 
-  // Si le bon chemin a déjà été trouvé auparavant, on l'applique immédiatement (0 ms de délai)
   if (resolvedPathCache[filename]) {
     imgElement.src = resolvedPathCache[filename];
     return;
   }
 
-  // Ordre de priorité intelligent : dossier spécifique, puis assets/, puis racine
   const candidatePaths = [
     originalPath,
-    `assets/cards/${filename}`,
     `assets/characters/${filename}`,
+    `assets/cards/${filename}`,
     `assets/${filename}`,
     filename
   ];
@@ -56,11 +24,11 @@ function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
 
   imgElement.src = uniquePaths[0];
 
-  imgElement.onload = function() {
+  imgElement.onload = function () {
     resolvedPathCache[filename] = imgElement.src;
   };
 
-  imgElement.onerror = function() {
+  imgElement.onerror = function () {
     idx++;
     if (idx < uniquePaths.length) {
       imgElement.src = uniquePaths[idx];
@@ -77,9 +45,33 @@ function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
   };
 }
 
-// --- MOTEUR AUDIO (Web Audio API) ---
+function preloadAllAssets() {
+  const imagesToPreload = [
+    "naruto.png", "brigand.png", "freres_demons.png", "haku.png", "zabuza.png",
+    "card_poing.png", "card_kawarimi.png", "card_clones.png", "card_rendan.png",
+    "card_kyubi.png", "card_fuma.png", "card_volonte.png", "card_2000poings.png",
+    "card_assaut.png", "card_chakra_rouge.png", "card_miroir.png"
+  ];
+
+  imagesToPreload.forEach(name => {
+    const dummyImg = new Image();
+    resolveImgSrc(dummyImg, name);
+  });
+}
+
+// ==========================================
+// 2. MOTEUR AUDIO (SFX & MUSIQUES)
+// ==========================================
 const AudioEngine = {
   ctx: null,
+  musicAudio: null,
+  currentTrack: null,
+  settings: {
+    master: 0.8,
+    music: 0.4,
+    sfx: 0.8
+  },
+
   init() {
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -87,10 +79,13 @@ const AudioEngine = {
     }
     if (this.ctx.state === "suspended") this.ctx.resume();
   },
+
   play(type) {
     this.init();
     const ctx = this.ctx;
     const now = ctx.currentTime;
+    const sfxVol = this.settings.master * this.settings.sfx;
+    if (sfxVol <= 0.001) return;
 
     if (type === "hit") {
       const osc = ctx.createOscillator();
@@ -98,20 +93,24 @@ const AudioEngine = {
       osc.type = "triangle";
       osc.frequency.setValueAtTime(140, now);
       osc.frequency.exponentialRampToValueAtTime(30, now + 0.12);
-      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.setValueAtTime(0.4 * sfxVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(now); osc.stop(now + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
     } else if (type === "block") {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
       osc.frequency.setValueAtTime(220, now);
       osc.frequency.exponentialRampToValueAtTime(90, now + 0.18);
-      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.setValueAtTime(0.35 * sfxVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(now); osc.stop(now + 0.18);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.18);
     } else if (type === "clone") {
       const bufferSize = ctx.sampleRate * 0.15;
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -124,9 +123,11 @@ const AudioEngine = {
       filter.frequency.setValueAtTime(800, now);
       filter.frequency.linearRampToValueAtTime(250, now + 0.15);
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.setValueAtTime(0.3 * sfxVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-      noise.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
       noise.start(now);
     } else if (type === "slash") {
       const osc = ctx.createOscillator();
@@ -134,29 +135,75 @@ const AudioEngine = {
       osc.type = "sawtooth";
       osc.frequency.setValueAtTime(900, now);
       osc.frequency.exponentialRampToValueAtTime(180, now + 0.14);
-      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.setValueAtTime(0.25 * sfxVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(now); osc.stop(now + 0.14);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.14);
     } else if (type === "kyubi") {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sawtooth";
       osc.frequency.setValueAtTime(90, now);
       osc.frequency.linearRampToValueAtTime(45, now + 0.35);
-      gain.gain.setValueAtTime(0.5, now);
+      gain.gain.setValueAtTime(0.5 * sfxVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(now); osc.stop(now + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.35);
+    }
+  },
+
+  playMusic(filename) {
+    if (this.currentTrack === filename) return;
+    this.currentTrack = filename;
+
+    const targetVolume = this.settings.master * this.settings.music;
+    const candidatePaths = [
+      `assets/audio/${filename}`,
+      `assets/${filename}`,
+      filename
+    ];
+
+    if (this.musicAudio) {
+      this.musicAudio.pause();
+      this.musicAudio = null;
+    }
+
+    const audio = new Audio();
+    audio.loop = true;
+    audio.volume = targetVolume;
+
+    let pathIdx = 0;
+    audio.src = candidatePaths[pathIdx];
+    audio.onerror = () => {
+      pathIdx++;
+      if (pathIdx < candidatePaths.length) {
+        audio.src = candidatePaths[pathIdx];
+        audio.play().catch(() => {});
+      }
+    };
+
+    audio.play().catch(() => {});
+    this.musicAudio = audio;
+  },
+
+  updateVolumes() {
+    if (this.musicAudio) {
+      this.musicAudio.volume = this.settings.master * this.settings.music;
     }
   }
 };
 
-// --- ÉTAT DU JEU ---
+// ==========================================
+// 3. ÉTAT DU JEU & VARIABLES GLOBALES
+// ==========================================
 let currentStageIndex = 0;
 let activeRelic = null;
 let isGameOver = false;
-let busy = false; // true pendant le tour de l'ennemi
+let busy = false;
 
 const state = {
   player: { hp: 60, maxHp: 60, shield: 0, chakra: 3, maxChakra: 3, clones: 0, willOfFire: false },
@@ -166,106 +213,23 @@ const state = {
   discard: []
 };
 
-// Précharge toutes les images en cache navigateur dès l'ouverture
-function preloadAllAssets() {
-  const imagesToPreload = [
-    "naruto.png", "brigand.png", "freres_demons.png", "haku.png", "zabuza.png",
-    "card_poing.png", "card_kawarimi.png", "card_clones.png", "card_rendan.png", "card_kyubi.png"
-  ];
+// ==========================================
+// 4. GESTION DES ANIMATIONS & VISUELS (VFX)
+// ==========================================
+function spawnFloatingText(targetBoxId, text, type = "damage") {
+  const box = document.getElementById(targetBoxId);
+  if (!box) return;
 
-  imagesToPreload.forEach(name => {
-    const dummyImg = new Image();
-    resolveImgSrc(dummyImg, name);
-  });
-}
+  const el = document.createElement("div");
+  el.className = `floating-text float-${type}`;
+  el.innerText = text;
 
-function initGame() {
-  isGameOver = false;
-  preloadAllAssets();
+  const randomX = Math.floor(Math.random() * 30) - 15;
+  el.style.left = `calc(50% + ${randomX}px)`;
+  el.style.top = "35%";
 
-  state.deck = [
-    { ...CARDS_POOL[0] }, { ...CARDS_POOL[0] }, { ...CARDS_POOL[0] },
-    { ...CARDS_POOL[1] }, { ...CARDS_POOL[1] }, { ...CARDS_POOL[1] },
-    { ...CARDS_POOL[2] }, { ...CARDS_POOL[2] },
-    { ...CARDS_POOL[3] },
-    { ...CARDS_POOL[4] }
-  ];
-
-  const narutoImg = document.getElementById("naruto-img");
-  resolveImgSrc(narutoImg, "naruto.png");
-
-  loadStage(0);
-}
-
-function loadStage(index) {
-  busy = false;
-  currentStageIndex = index;
-  const stage = STAGES[index];
-  updateNodeMap(index >= 3 ? index + 1 : index);
-
-  document.body.className = stage.bgClass;
-  const titleEl = document.getElementById("stage-title");
-  if (titleEl) titleEl.innerText = stage.title;
-
-  state.enemy.hp = stage.maxHp;
-  state.enemy.maxHp = stage.maxHp;
-  state.enemy.shield = 0;
-  state.enemy.mist = false;
-  state.enemy.turnCount = 1;
-
-  state.player.shield = 0;
-  state.player.chakra = state.player.maxChakra;
-  state.player.clones = 0;
-  renderClones();
-
-  if (activeRelic && activeRelic.onCombatStart) {
-    activeRelic.onCombatStart(state);
-  }
-
-  const enemyImg = document.getElementById("enemy-img");
-  resolveImgSrc(enemyImg, stage.sprite);
-
-  state.deck.push(...state.hand, ...state.discard);
-  state.hand = [];
-  state.discard = [];
-  shuffle(state.deck);
-
-  drawCards(4);
-  updateUI();
-  document.getElementById("log").innerText = `Combat : ${stage.name} !`;
-}
-
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-}
-
-function drawCards(n) {
-  for (let i = 0; i < n; i++) {
-    if (state.deck.length === 0) {
-      if (state.discard.length === 0) break;
-      state.deck = state.discard.slice();
-      state.discard = [];
-      shuffle(state.deck);
-    }
-    if (state.deck.length > 0) state.hand.push(state.deck.pop());
-  }
-  renderHand();
-  updateCounters();
-}
-
-function renderClones() {
-  const container = document.getElementById("clones-container");
-  container.innerHTML = "";
-  for (let i = 0; i < Math.min(state.player.clones, 4); i++) {
-    const img = document.createElement("img");
-    img.className = "clone-sprite";
-    resolveImgSrc(img, "naruto.png");
-    container.appendChild(img);
-  }
-  document.getElementById("player-clones-txt").innerText = `Clones actifs : ${state.player.clones}`;
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 900);
 }
 
 function triggerShake(id) {
@@ -276,24 +240,6 @@ function triggerShake(id) {
   el.classList.add("shake");
 }
 
-function checkPlayerDeath() {
-  if (state.player.hp <= 0 && !isGameOver) {
-    isGameOver = true;
-    state.player.hp = 0;
-    updateUI();
-    const overlay = document.getElementById("overlay");
-    overlay.style.display = "flex";
-    document.getElementById("overlay-title").innerText = "DÉFAITE...";
-    document.getElementById("overlay-title").style.color = "#ef4444";
-    document.getElementById("overlay-sub").innerText = "Naruto est tombé au combat. La mission du Pays des Vagues a échoué.";
-    const picker = document.getElementById("rewards-picker");
-    picker.innerHTML = `<button id="end-turn-btn" style="padding:14px 32px; font-size:16px; background:#b91c1c;" onclick="location.reload()">Réessayer la mission</button>`;
-    return true;
-  }
-  return false;
-}
-
-// Déclenche l'animation d'avancée/recul d'un combattant
 function triggerRush(fighterBoxId, isPlayer = true) {
   const box = document.getElementById(fighterBoxId);
   if (!box) return;
@@ -303,7 +249,6 @@ function triggerRush(fighterBoxId, isPlayer = true) {
   box.classList.add(animClass);
 }
 
-// Fait apparaître un effet visuel (Slash, Fumée, Projectile)
 function spawnVFX(type, targetBoxId = "enemy-box") {
   const targetBox = document.getElementById(targetBoxId);
   const combatZone = document.getElementById("combat-zone");
@@ -328,14 +273,187 @@ function spawnVFX(type, targetBoxId = "enemy-box") {
   }
 }
 
+function updateNodeMap(currentIndex) {
+  for (let i = 0; i <= 4; i++) {
+    const nodeEl = document.getElementById(`node-${i}`);
+    if (!nodeEl) continue;
+    nodeEl.classList.remove("active", "completed");
+
+    if (i < currentIndex) {
+      nodeEl.classList.add("completed");
+    } else if (i === currentIndex) {
+      nodeEl.classList.add("active");
+    }
+  }
+}
+
+function renderClones() {
+  const container = document.getElementById("clones-container");
+  if (!container) return;
+  container.innerHTML = "";
+  for (let i = 0; i < Math.min(state.player.clones, 4); i++) {
+    const img = document.createElement("img");
+    img.className = "clone-sprite";
+    resolveImgSrc(img, "naruto.png");
+    container.appendChild(img);
+  }
+  const clonesTxt = document.getElementById("player-clones-txt");
+  if (clonesTxt) clonesTxt.innerText = `Clones actifs : ${state.player.clones}`;
+}
+
+// ==========================================
+// 5. GESTION DES COMBATS & DES ÉTAPES
+// ==========================================
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function drawCards(n) {
+  for (let i = 0; i < n; i++) {
+    if (state.deck.length === 0) {
+      if (state.discard.length === 0) break;
+      state.deck = state.discard.slice();
+      state.discard = [];
+      shuffle(state.deck);
+    }
+    if (state.deck.length > 0) {
+      state.hand.push(state.deck.pop());
+    }
+  }
+  renderHand();
+  updateCounters();
+}
+
+function loadStage(index) {
+  currentStageIndex = index;
+  const stage = STAGES[index];
+
+  updateNodeMap(index);
+  document.body.className = stage.bgClass;
+
+  const stageTitle = document.getElementById("stage-title");
+  if (stageTitle) stageTitle.innerText = stage.title;
+
+  // Lancement de la musique correspondante
+  if (index <= 1) {
+    AudioEngine.playMusic("combat1.mp3");
+  } else {
+    AudioEngine.playMusic("combat2.mp3");
+  }
+
+  // Initialisation de l'ennemi
+  state.enemy.hp = stage.maxHp;
+  state.enemy.maxHp = stage.maxHp;
+  state.enemy.shield = 0;
+  state.enemy.mist = false;
+  state.enemy.turnCount = 1;
+
+  // Initialisation du tour du joueur
+  state.player.shield = 0;
+  state.player.chakra = state.player.maxChakra;
+  state.player.clones = 0;
+  renderClones();
+
+  if (activeRelic && activeRelic.onCombatStart) {
+    activeRelic.onCombatStart(state);
+  }
+
+  const enemyImg = document.getElementById("enemy-img");
+  if (enemyImg) resolveImgSrc(enemyImg, stage.sprite);
+
+  // Remise en deck de toutes les cartes
+  state.deck.push(...state.hand, ...state.discard);
+  state.hand = [];
+  state.discard = [];
+  shuffle(state.deck);
+
+  saveGame();
+
+  drawCards(4);
+  updateUI();
+
+  const logEl = document.getElementById("log");
+  if (logEl) logEl.innerText = `Combat : ${stage.name} !`;
+}
+
+function dealDamageToEnemy(amt) {
+  triggerShake("enemy-box");
+  let directHpDmg = amt;
+
+  if (state.enemy.shield > 0) {
+    if (amt <= state.enemy.shield) {
+      state.enemy.shield -= amt;
+      spawnFloatingText("enemy-box", `-${amt}`, "shield");
+      directHpDmg = 0;
+    } else {
+      const absorbed = state.enemy.shield;
+      directHpDmg = amt - absorbed;
+      state.enemy.shield = 0;
+      spawnFloatingText("enemy-box", `-${absorbed}`, "shield");
+    }
+  }
+
+  if (directHpDmg > 0) {
+    state.enemy.hp = Math.max(0, state.enemy.hp - directHpDmg);
+    spawnFloatingText("enemy-box", `-${directHpDmg}`, "damage");
+  }
+}
+
+function hitPlayer(amt) {
+  triggerShake("naruto-box");
+  let directHpDmg = amt;
+
+  if (state.player.shield > 0) {
+    if (amt <= state.player.shield) {
+      state.player.shield -= amt;
+      spawnFloatingText("naruto-box", `-${amt}`, "shield");
+      directHpDmg = 0;
+    } else {
+      const absorbed = state.player.shield;
+      directHpDmg = amt - absorbed;
+      state.player.shield = 0;
+      spawnFloatingText("naruto-box", `-${absorbed}`, "shield");
+    }
+  }
+
+  if (directHpDmg > 0) {
+    state.player.hp = Math.max(0, state.player.hp - directHpDmg);
+    spawnFloatingText("naruto-box", `-${directHpDmg}`, "damage");
+    if (activeRelic && activeRelic.onDamage) activeRelic.onDamage(state);
+  }
+  checkPlayerDeath();
+}
+
+function checkPlayerDeath() {
+  if (state.player.hp <= 0 && !isGameOver) {
+    isGameOver = true;
+    state.player.hp = 0;
+    clearSave();
+    updateUI();
+
+    const overlay = document.getElementById("overlay");
+    overlay.style.display = "flex";
+    document.getElementById("overlay-title").innerText = "DÉFAITE...";
+    document.getElementById("overlay-title").style.color = "#ef4444";
+    document.getElementById("overlay-sub").innerText = "Naruto est tombé au combat. La mission du Pays des Vagues a échoué.";
+    const picker = document.getElementById("rewards-picker");
+    picker.innerHTML = `<button id="end-turn-btn" style="padding:14px 32px; font-size:16px; background:#b91c1c;" onclick="location.reload()">Retourner au Menu</button>`;
+    return true;
+  }
+  return false;
+}
+
 function playCard(idx) {
-  if (isGameOver) return;
+  if (isGameOver || busy) return;
   const card = state.hand[idx];
   if (!card || state.player.chakra < card.cost) return;
 
   state.player.chakra -= card.cost;
 
-  // VFX et Audio selon le type d'action
+  // Effets d'impact et sons
   if (card.type === "kyubi") {
     AudioEngine.play("kyubi");
     triggerRush("naruto-box", true);
@@ -351,7 +469,6 @@ function playCard(idx) {
     triggerRush("naruto-box", true);
     spawnVFX("fuma");
   } else {
-    // Attaque physique normale (Coup de Poing, Naruto Rendan, Combo 2000)
     AudioEngine.play("hit");
     triggerRush("naruto-box", true);
     spawnVFX("slash", "enemy-box");
@@ -360,6 +477,7 @@ function playCard(idx) {
   if (card.selfDmg) {
     state.player.hp = Math.max(0, state.player.hp - card.selfDmg);
     triggerShake("naruto-box");
+    spawnFloatingText("naruto-box", `-${card.selfDmg}`, "damage");
     if (activeRelic && activeRelic.onDamage) activeRelic.onDamage(state);
     if (checkPlayerDeath()) return;
   }
@@ -404,29 +522,6 @@ function playCard(idx) {
   if (state.enemy.hp <= 0) handleStageVictory();
 }
 
-function dealDamageToEnemy(amt) {
-  triggerShake("enemy-box");
-  let directHpDmg = amt;
-
-  if (state.enemy.shield > 0) {
-    if (amt <= state.enemy.shield) {
-      state.enemy.shield -= amt;
-      spawnFloatingText("enemy-box", `-${amt}`, "shield");
-      directHpDmg = 0;
-    } else {
-      const absorbed = state.enemy.shield;
-      directHpDmg = amt - absorbed;
-      state.enemy.shield = 0;
-      spawnFloatingText("enemy-box", `-${absorbed}`, "shield");
-    }
-  }
-
-  if (directHpDmg > 0) {
-    state.enemy.hp = Math.max(0, state.enemy.hp - directHpDmg);
-    spawnFloatingText("enemy-box", `-${directHpDmg}`, "damage");
-  }
-}
-
 function endTurn() {
   if (isGameOver || busy || state.enemy.hp <= 0) return;
   busy = true;
@@ -441,7 +536,12 @@ function endTurn() {
   while (state.hand.length > 0) state.discard.push(state.hand.pop());
   renderHand();
 
-  if (state.enemy.hp <= 0) { busy = false; updateUI(); handleStageVictory(); return; }
+  if (state.enemy.hp <= 0) {
+    busy = false;
+    updateUI();
+    handleStageVictory();
+    return;
+  }
 
   const stage = STAGES[currentStageIndex];
   const move = stage.pattern[(state.enemy.turnCount - 1) % stage.pattern.length];
@@ -453,12 +553,10 @@ function endTurn() {
 
   const hits = move.multiHit ? Array(move.multiHit).fill(move.hitDmg) : (move.dmg ? [move.dmg] : []);
 
-  // 1. L'ennemi s'élance vers Naruto s'il porte au moins un coup
   if (hits.length > 0) {
     triggerRush("enemy-box", false);
   }
 
-  // 2. Traitement des impacts et des taillades (VFX)
   const totalAnimTime = hits.length * 160;
   hits.forEach((d, i) => {
     setTimeout(() => {
@@ -469,9 +567,11 @@ function endTurn() {
     }, i * 160);
   });
 
-  // 3. Clôture du tour après la fin de toutes les frappes
   setTimeout(() => {
-    if (isGameOver) { busy = false; return; }
+    if (isGameOver) {
+      busy = false;
+      return;
+    }
 
     state.enemy.mist = !!move.mist;
     if (move.clearClones) {
@@ -491,52 +591,12 @@ function endTurn() {
   }, Math.max(totalAnimTime, 100));
 }
 
-function finishEnemyTurn(move) {
-  if (isGameOver) return;
-
-  state.enemy.mist = !!move.mist;
-  if (move.clearClones) {
-    state.player.clones = 0;
-    renderClones();
-    AudioEngine.play("clone");
-    document.getElementById("log").innerText = "Grande Cataracte ! Tous tes clones sont balayés !";
-  }
-
-  state.player.shield = 0;
-  state.player.chakra = state.player.maxChakra;
-  state.enemy.turnCount++;
-  drawCards(4);
-  updateUI();
-  busy = false;
-}
-
-function hitPlayer(amt) {
-  triggerShake("naruto-box");
-  let directHpDmg = amt;
-
-  if (state.player.shield > 0) {
-    if (amt <= state.player.shield) {
-      state.player.shield -= amt;
-      spawnFloatingText("naruto-box", `-${amt}`, "shield");
-      directHpDmg = 0;
-    } else {
-      const absorbed = state.player.shield;
-      directHpDmg = amt - absorbed;
-      state.player.shield = 0;
-      spawnFloatingText("naruto-box", `-${absorbed}`, "shield");
-    }
-  }
-
-  if (directHpDmg > 0) {
-    state.player.hp = Math.max(0, state.player.hp - directHpDmg);
-    spawnFloatingText("naruto-box", `-${directHpDmg}`, "damage");
-    if (activeRelic && activeRelic.onDamage) activeRelic.onDamage(state);
-  }
-  checkPlayerDeath();
-}
-
+// ==========================================
+// 6. INTERFACE UTILISATEUR & CARTES EN MAIN
+// ==========================================
 function renderHand() {
   const h = document.getElementById("hand");
+  if (!h) return;
   h.innerHTML = "";
   if (isGameOver) return;
 
@@ -575,8 +635,10 @@ function updateUI() {
   document.getElementById("chakra-display").innerText = `Chakra : ${state.player.chakra} / ${state.player.maxChakra}`;
 
   const stage = STAGES[currentStageIndex];
-  const nextMove = stage.pattern[(state.enemy.turnCount - 1) % stage.pattern.length];
-  document.getElementById("enemy-intent").innerText = `Prépare : ${nextMove.intent}`;
+  const nextMove = stage.pattern[state.enemy.turnCount % stage.pattern.length];
+  const intentEl = document.getElementById("enemy-intent");
+  if (intentEl) intentEl.innerText = `Prépare : ${nextMove.intent}`;
+
   updateCounters();
 }
 
@@ -587,26 +649,93 @@ function updateCounters() {
   if (discardEl) discardEl.innerText = state.discard.length;
 }
 
-// --- FEU DE CAMP & AMÉLIORATION DE CARTES ---
+// ==========================================
+// 7. INSPECTEUR DE PIOCHE ET DÉFAUSSE
+// ==========================================
+function openInspector(pileType) {
+  const modal = document.getElementById("inspector-modal");
+  const title = document.getElementById("inspector-title");
+  const grid = document.getElementById("inspector-grid");
+  if (!modal || !title || !grid) return;
+
+  const cardsList = pileType === "deck" ? state.deck : state.discard;
+  const pileName = pileType === "deck" ? "Pioche" : "Défausse";
+
+  title.innerText = `${pileName} (${cardsList.length} carte${cardsList.length > 1 ? "s" : ""})`;
+  grid.innerHTML = "";
+
+  if (cardsList.length === 0) {
+    grid.innerHTML = `<p style="color: #8b949e; margin: 40px 0; font-size: 15px;">Cette pile est actuellement vide.</p>`;
+  } else {
+    const sortedCards = [...cardsList].sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name));
+
+    sortedCards.forEach(card => {
+      const el = document.createElement("div");
+      el.className = `card card-${card.type}`;
+      el.innerHTML = `
+        <div class="card-top">
+          <span class="card-title">${card.name}</span>
+          <span class="card-cost">${card.cost}</span>
+        </div>
+        <div class="card-art">
+          <img class="card-img-el" alt="${card.name}">
+          <span class="card-art-placeholder" style="display:none;">${card.icon || "🎴"}</span>
+        </div>
+        <div class="card-desc">${card.desc}</div>
+        <div class="card-tag">${card.type}</div>
+      `;
+
+      const imgEl = el.querySelector(".card-img-el");
+      resolveImgSrc(imgEl, card.img, card.icon);
+      grid.appendChild(el);
+    });
+  }
+
+  modal.style.display = "flex";
+}
+
+function closeInspector(event) {
+  if (event && event.target && event.target.id !== "inspector-modal" && !event.target.classList.contains("inspector-close-btn")) {
+    return;
+  }
+  const modal = document.getElementById("inspector-modal");
+  if (modal) modal.style.display = "none";
+}
+
+// ==========================================
+// 8. FEU DE CAMP & AMÉLIORATION DE CARTES
+// ==========================================
 function openRestSite() {
   updateNodeMap(3);
-  document.getElementById("rest-screen").style.display = "flex";
-  document.getElementById("rest-choices").style.display = "flex";
-  document.getElementById("upgrade-picker").style.display = "none";
+  saveGame();
+
+  const restScreen = document.getElementById("rest-screen");
+  const restChoices = document.getElementById("rest-choices");
+  const upgradePicker = document.getElementById("upgrade-picker");
+
+  if (restScreen) restScreen.style.display = "flex";
+  if (restChoices) restChoices.style.display = "flex";
+  if (upgradePicker) upgradePicker.style.display = "none";
 }
 
 function takeRest() {
   state.player.hp = Math.min(state.player.maxHp, state.player.hp + 25);
   AudioEngine.play("kyubi");
   spawnFloatingText("naruto-box", "+25", "heal");
-  document.getElementById("rest-screen").style.display = "none";
+
+  const restScreen = document.getElementById("rest-screen");
+  if (restScreen) restScreen.style.display = "none";
+
   updateUI();
   loadStage(3);
 }
 
 function openUpgradePicker() {
-  document.getElementById("rest-choices").style.display = "none";
+  const restChoices = document.getElementById("rest-choices");
   const picker = document.getElementById("upgrade-picker");
+  if (restChoices) restChoices.style.display = "none";
+  if (!picker) return;
+
   picker.style.display = "flex";
   picker.innerHTML = "";
 
@@ -618,7 +747,7 @@ function openUpgradePicker() {
     return;
   }
 
-  upgradable.forEach((card) => {
+  upgradable.forEach(card => {
     const el = document.createElement("div");
     el.className = `card card-${card.type}`;
     el.style.transform = "scale(1.05)";
@@ -647,7 +776,8 @@ function openUpgradePicker() {
     el.onclick = () => {
       upgradeCard(card);
       AudioEngine.play("block");
-      document.getElementById("rest-screen").style.display = "none";
+      const restScreen = document.getElementById("rest-screen");
+      if (restScreen) restScreen.style.display = "none";
       loadStage(3);
     };
     picker.appendChild(el);
@@ -669,7 +799,9 @@ function upgradeCard(cardRef) {
   }
 }
 
-// --- VICTOIRE D'ÉTAPE ---
+// ==========================================
+// 9. VICTOIRES & RÉCOMPENSES
+// ==========================================
 function handleStageVictory() {
   const overlay = document.getElementById("overlay");
   overlay.style.display = "flex";
@@ -677,10 +809,11 @@ function handleStageVictory() {
   picker.innerHTML = "";
 
   if (currentStageIndex === STAGES.length - 1) {
+    clearSave();
     document.getElementById("overlay-title").innerText = "VICTOIRE TOTALE SUR LE PAYS DES VAGUES !";
     document.getElementById("overlay-title").style.color = "#f59e0b";
     document.getElementById("overlay-sub").innerText = "Le grand pont Naruto est achevé. Zabuza a été vaincu !";
-    picker.innerHTML = `<button id="end-turn-btn" style="padding:14px 30px; font-size:16px;" onclick="location.reload()">Recommencer la campagne</button>`;
+    picker.innerHTML = `<button id="end-turn-btn" style="padding:14px 30px; font-size:16px;" onclick="location.reload()">Retourner au Menu</button>`;
     return;
   }
 
@@ -741,56 +874,134 @@ function handleStageVictory() {
   });
 }
 
-// --- INSPECTEUR DE PIOCHE ET DÉFAUSSE ---
-function openInspector(pileType) {
-  const modal = document.getElementById("inspector-modal");
-  const title = document.getElementById("inspector-title");
-  const grid = document.getElementById("inspector-grid");
-  if (!modal || !title || !grid) return;
+// ==========================================
+// 10. SAUVEGARDE LOCALE & MENU PRINCIPAL
+// ==========================================
+const SAVE_KEY = "naruto_deckbuilder_save";
 
-  const cardsList = pileType === "deck" ? state.deck : state.discard;
-  const pileName = pileType === "deck" ? "Pioche" : "Défausse";
-
-  title.innerText = `${pileName} (${cardsList.length} carte${cardsList.length > 1 ? "s" : ""})`;
-  grid.innerHTML = "";
-
-  if (cardsList.length === 0) {
-    grid.innerHTML = `<p style="color: #8b949e; margin: 40px 0; font-size: 15px;">Cette pile est actuellement vide.</p>`;
-  } else {
-    // Trier les cartes par coût de chakra puis par nom
-    const sortedCards = [...cardsList].sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name));
-
-    sortedCards.forEach(card => {
-      const el = document.createElement("div");
-      el.className = `card card-${card.type}`;
-      el.innerHTML = `
-        <div class="card-top">
-          <span class="card-title">${card.name}</span>
-          <span class="card-cost">${card.cost}</span>
-        </div>
-        <div class="card-art">
-          <img class="card-img-el" alt="${card.name}">
-          <span class="card-art-placeholder" style="display:none;">${card.icon || "🎴"}</span>
-        </div>
-        <div class="card-desc">${card.desc}</div>
-        <div class="card-tag">${card.type}</div>
-      `;
-
-      const imgEl = el.querySelector(".card-img-el");
-      resolveImgSrc(imgEl, card.img, card.icon);
-      grid.appendChild(el);
-    });
-  }
-
-  modal.style.display = "flex";
+function saveGame() {
+  if (isGameOver) return;
+  const saveData = {
+    currentStageIndex,
+    activeRelicId: activeRelic ? activeRelic.id : null,
+    playerHp: state.player.hp,
+    playerMaxHp: state.player.maxHp,
+    playerWillOfFire: state.player.willOfFire,
+    deck: state.deck
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
 }
 
-function closeInspector(event) {
-  if (event && event.target && event.target.id !== "inspector-modal" && !event.target.classList.contains("inspector-close-btn")) {
+function clearSave() {
+  localStorage.removeItem(SAVE_KEY);
+}
+
+function hasSavedGame() {
+  return localStorage.getItem(SAVE_KEY) !== null;
+}
+
+function continueGame() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) return;
+  const data = JSON.parse(raw);
+
+  isGameOver = false;
+  state.player.hp = data.playerHp;
+  state.player.maxHp = data.playerMaxHp;
+  state.player.willOfFire = !!data.playerWillOfFire;
+  state.deck = data.deck;
+
+  if (data.activeRelicId) {
+    activeRelic = RELICS_POOL.find(r => r.id === data.activeRelicId) || null;
+    if (activeRelic && activeRelic.apply) activeRelic.apply(state);
+    if (activeRelic) document.getElementById("relics-bar").innerText = `Relique : ${activeRelic.name}`;
+  }
+
+  document.getElementById("main-menu").style.display = "none";
+  loadStage(data.currentStageIndex);
+}
+
+function startNewGamePrompt() {
+  clearSave();
+  document.getElementById("main-menu").style.display = "none";
+  initNewGame();
+}
+
+function initNewGame() {
+  isGameOver = false;
+  activeRelic = null;
+  state.player.hp = 60;
+  state.player.maxHp = 60;
+  state.player.maxChakra = 3;
+  state.player.willOfFire = false;
+  document.getElementById("relics-bar").innerText = "Relique : Aucune";
+
+  state.deck = [
+    { ...CARDS_POOL[0] }, { ...CARDS_POOL[0] }, { ...CARDS_POOL[0] },
+    { ...CARDS_POOL[1] }, { ...CARDS_POOL[1] }, { ...CARDS_POOL[1] },
+    { ...CARDS_POOL[2] }, { ...CARDS_POOL[2] },
+    { ...CARDS_POOL[3] },
+    { ...CARDS_POOL[4] }
+  ];
+  state.hand = [];
+  state.discard = [];
+
+  const narutoImg = document.getElementById("naruto-img");
+  if (narutoImg) resolveImgSrc(narutoImg, "naruto.png");
+
+  loadStage(0);
+}
+
+// ==========================================
+// 11. OPTIONS & PARAMÈTRES
+// ==========================================
+function openSettingsModal() {
+  document.getElementById("settings-modal").style.display = "flex";
+}
+
+function closeSettingsModal(event) {
+  if (event && event.target && event.target.id !== "settings-modal" && !event.target.classList.contains("inspector-close-btn") && event.target.tagName !== "BUTTON") {
     return;
   }
-  const modal = document.getElementById("inspector-modal");
-  if (modal) modal.style.display = "none";
+  document.getElementById("settings-modal").style.display = "none";
 }
 
-window.onload = initGame;
+function updateAudioSettings() {
+  const master = parseFloat(document.getElementById("vol-master").value);
+  const music = parseFloat(document.getElementById("vol-music").value);
+  const sfx = parseFloat(document.getElementById("vol-sfx").value);
+
+  document.getElementById("val-vol-master").innerText = `${Math.round(master * 100)}%`;
+  document.getElementById("val-vol-music").innerText = `${Math.round(music * 100)}%`;
+  document.getElementById("val-vol-sfx").innerText = `${Math.round(sfx * 100)}%`;
+
+  AudioEngine.settings.master = master;
+  AudioEngine.settings.music = music;
+  AudioEngine.settings.sfx = sfx;
+  AudioEngine.updateVolumes();
+}
+
+function updateDisplaySettings() {
+  const scale = parseFloat(document.getElementById("card-size").value);
+  document.getElementById("val-card-size").innerText = `${Math.round(scale * 100)}%`;
+  document.documentElement.style.setProperty("--card-scale", scale);
+
+  const fontChoice = document.getElementById("font-size-select").value;
+  let fontPx = "14px";
+  if (fontChoice === "small") fontPx = "12px";
+  if (fontChoice === "large") fontPx = "16px";
+  document.documentElement.style.setProperty("--game-font-size", fontPx);
+}
+
+// ==========================================
+// 12. DÉMARRAGE AU CHARGEMENT DE LA PAGE
+// ==========================================
+window.onload = () => {
+  preloadAllAssets();
+  AudioEngine.playMusic("title.mp3");
+
+  if (hasSavedGame()) {
+    const btnContinue = document.getElementById("btn-continue");
+    if (btnContinue) btnContinue.style.display = "block";
+  }
+};
