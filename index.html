@@ -51,6 +51,29 @@
     <button id="end-turn-btn" onclick="endTurn()">Fin du tour</button>
   </div>
 
+  <!-- Écran de Repos / Feu de camp chez Tazuna -->
+  <div id="rest-screen">
+    <h2 style="color: #f59e0b; font-size: 28px;">Maison de Tazuna (Feu de camp)</h2>
+    <p style="color: #d6d3d1; margin-top: 8px; max-width: 500px;">
+      Après le rude combat contre Haku, l'équipe se regroupe avant le combat décisif sur le pont. Fais ton choix :
+    </p>
+
+    <div class="rest-options" id="rest-choices">
+      <div class="rest-btn" onclick="takeRest()">
+        <span class="rest-icon">🍜</span>
+        <span class="rest-title">Ramen de Tsunami</span>
+        <span class="rest-desc">Restaure 25 PV immédiatement.</span>
+      </div>
+      <div class="rest-btn" onclick="openUpgradePicker()">
+        <span class="rest-icon">⚡</span>
+        <span class="rest-title">Entraînement Chakra</span>
+        <span class="rest-desc">Améliore une technique de ton deck en version puissante (+).</span>
+      </div>
+    </div>
+
+    <div id="upgrade-picker"></div>
+  </div>
+
   <div id="overlay">
     <h2 id="overlay-title" style="color:#f59e0b; font-size: 26px;">VICTOIRE !</h2>
     <p id="overlay-sub" style="color:#8b949e; margin-top: 6px;">Choisis ta récompense :</p>
