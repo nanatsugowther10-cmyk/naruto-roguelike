@@ -503,7 +503,10 @@ function updateUI() {
 }
 
 function updateCounters() {
-  document.getElementById("deck-info").innerText = `Pioche : ${state.deck.length} | Défausse : ${state.discard.length}`;
+  const drawEl = document.getElementById("draw-count");
+  const discardEl = document.getElementById("discard-count");
+  if (drawEl) drawEl.innerText = state.deck.length;
+  if (discardEl) discardEl.innerText = state.discard.length;
 }
 
 // --- FEU DE CAMP & AMÉLIORATION DE CARTES ---
@@ -658,6 +661,58 @@ function handleStageVictory() {
     };
     picker.appendChild(el);
   });
+}
+
+// --- INSPECTEUR DE PIOCHE ET DÉFAUSSE ---
+function openInspector(pileType) {
+  const modal = document.getElementById("inspector-modal");
+  const title = document.getElementById("inspector-title");
+  const grid = document.getElementById("inspector-grid");
+  if (!modal || !title || !grid) return;
+
+  const cardsList = pileType === "deck" ? state.deck : state.discard;
+  const pileName = pileType === "deck" ? "Pioche" : "Défausse";
+
+  title.innerText = `${pileName} (${cardsList.length} carte${cardsList.length > 1 ? "s" : ""})`;
+  grid.innerHTML = "";
+
+  if (cardsList.length === 0) {
+    grid.innerHTML = `<p style="color: #8b949e; margin: 40px 0; font-size: 15px;">Cette pile est actuellement vide.</p>`;
+  } else {
+    // Trier les cartes par coût de chakra puis par nom
+    const sortedCards = [...cardsList].sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name));
+
+    sortedCards.forEach(card => {
+      const el = document.createElement("div");
+      el.className = `card card-${card.type}`;
+      el.innerHTML = `
+        <div class="card-top">
+          <span class="card-title">${card.name}</span>
+          <span class="card-cost">${card.cost}</span>
+        </div>
+        <div class="card-art">
+          <img class="card-img-el" alt="${card.name}">
+          <span class="card-art-placeholder" style="display:none;">${card.icon || "🎴"}</span>
+        </div>
+        <div class="card-desc">${card.desc}</div>
+        <div class="card-tag">${card.type}</div>
+      `;
+
+      const imgEl = el.querySelector(".card-img-el");
+      resolveImgSrc(imgEl, card.img, card.icon);
+      grid.appendChild(el);
+    });
+  }
+
+  modal.style.display = "flex";
+}
+
+function closeInspector(event) {
+  if (event && event.target && event.target.id !== "inspector-modal" && !event.target.classList.contains("inspector-close-btn")) {
+    return;
+  }
+  const modal = document.getElementById("inspector-modal");
+  if (modal) modal.style.display = "none";
 }
 
 window.onload = initGame;
