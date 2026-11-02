@@ -217,6 +217,66 @@ body.stage-bg-4 #mist-overlay {
   animation: floatCombatText 0.9s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
 }
 
+/* Frise de progression (Node Map) */
+#node-map {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  opacity: 0.4;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.node-icon {
+  width: 28px;
+  height: 28px;
+  background: #161b22;
+  border: 2px solid #30363d;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+.node-label {
+  font-size: 10px;
+  color: #8b949e;
+  margin-top: 2px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+.node-line {
+  width: 20px;
+  height: 2px;
+  background: #30363d;
+  margin-bottom: 14px;
+}
+
+/* États des nœuds */
+.node.completed {
+  opacity: 0.8;
+}
+.node.completed .node-icon {
+  border-color: #238636;
+  background: #112217;
+}
+.node.active {
+  opacity: 1;
+  transform: scale(1.15);
+}
+.node.active .node-icon {
+  border-color: #f59e0b;
+  background: #2a2110;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+.node.active .node-label {
+  color: #f59e0b;
+}
+
 @keyframes floatCombatText {
   0% {
     opacity: 0;
