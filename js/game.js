@@ -1,3 +1,107 @@
+// --- MOTEUR AUDIO SYNTHÉTIQUE (Web Audio API) ---
+const AudioEngine = {
+  ctx: null,
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AudioCtx();
+    }
+    if (this.ctx.state === "suspended") {
+      this.ctx.resume();
+    }
+  },
+
+  play(type) {
+    this.init();
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    if (type === "hit") {
+      // Coup sec de poing (baisse rapide de fréquence)
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.exponentialRampToValueAtTime(30, now + 0.12);
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
+
+    } else if (type === "block") {
+      // Bûche de substitution Kawarimi (résonance boisée)
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(90, now + 0.18);
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.18);
+
+    } else if (type === "clone") {
+      // Bruit blanc filtré ("Poof" d'invocation)
+      const bufferSize = ctx.sampleRate * 0.15;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(800, now);
+      filter.frequency.linearRampToValueAtTime(250, now + 0.15);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      noise.start(now);
+
+    } else if (type === "slash") {
+      // Tranchant métallique d'épée / Senbon
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(900, now);
+      osc.frequency.exponentialRampToValueAtTime(180, now + 0.14);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.14);
+
+    } else if (type === "kyubi") {
+      // Rugissement sourd de Chakra démoniaque
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(90, now);
+      osc.frequency.linearRampToValueAtTime(45, now + 0.35);
+      gain.gain.setValueAtTime(0.5, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.35);
+    }
+  }
+};
+
+// --- ÉTAT DU JEU & LOGIQUE DE COMBAT ---
 let currentStageIndex = 0;
 let activeRelic = null;
 
@@ -99,6 +203,17 @@ function playCard(idx) {
 
   state.player.chakra -= card.cost;
 
+  // Effets sonores thématiques selon la carte jouée
+  if (card.type === "kyubi") {
+    AudioEngine.play("kyubi");
+  } else if (card.shield > 0) {
+    AudioEngine.play("block");
+  } else if (card.clones > 0) {
+    AudioEngine.play("clone");
+  } else {
+    AudioEngine.play("hit");
+  }
+
   if (card.selfDmg) {
     state.player.hp = Math.max(1, state.player.hp - card.selfDmg);
     triggerShake("naruto-box");
@@ -144,9 +259,11 @@ function dealDamageToEnemy(amt) {
 function endTurn() {
   if (state.enemy.hp <= 0) return;
 
+  // Attaque des clones
   if (state.player.clones > 0) {
     const cDmg = state.player.clones * 3;
     dealDamageToEnemy(cDmg);
+    AudioEngine.play("hit");
     document.getElementById("log").innerText = `Les clones frappent pour ${cDmg} dégâts !`;
   }
 
@@ -155,22 +272,31 @@ function endTurn() {
 
   if (state.enemy.hp <= 0) { handleStageVictory(); return; }
 
+  // Tour ennemi
   const stage = STAGES[currentStageIndex];
   const move = stage.pattern[(state.enemy.turnCount - 1) % stage.pattern.length];
 
   if (move.multiHit) {
     for (let i = 0; i < move.multiHit; i++) {
-      setTimeout(() => hitPlayer(move.hitDmg), i * 150);
+      setTimeout(() => {
+        hitPlayer(move.hitDmg);
+        AudioEngine.play("slash");
+      }, i * 160);
     }
   } else if (move.dmg) {
     hitPlayer(move.dmg);
+    AudioEngine.play("slash");
   }
 
-  if (move.shield) state.enemy.shield += move.shield;
+  if (move.shield) {
+    state.enemy.shield += move.shield;
+    AudioEngine.play("block");
+  }
   state.enemy.mist = !!move.mist;
   if (move.clearClones) {
     state.player.clones = 0;
     renderClones();
+    AudioEngine.play("clone");
     document.getElementById("log").innerText = "Grande Cataracte ! Tous tes clones sont balayés !";
   }
 
