@@ -107,7 +107,8 @@ body.stage-bg-4 #mist-overlay {
   z-index: 20; backdrop-filter: blur(6px);
 }
 #chakra-display { font-size: 18px; font-weight: 800; color: #38bdf8; margin: 8px 0; }
-#hand { display: flex; gap: 12px; margin-bottom: 10px; min-height: 180px; }
+#hand { display: flex; gap: 12px; margin-bottom: 10px; min-height: 200px; }
+
 .card {
   width: 140px;
   height: 200px;
@@ -137,19 +138,10 @@ body.stage-bg-4 #mist-overlay {
 .card-top { display: flex; justify-content: space-between; align-items: center; }
 .card-title { font-size: 11px; font-weight: bold; color: #f0f6fc; }
 .card-cost {
-  background: #38bdf8;
-  color: #0d1117;
-  font-weight: 900;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
+  background: #38bdf8; color: #0d1117; font-weight: 900;
+  width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px;
 }
 
-/* Zone d'illustration centrale */
 .card-art {
   width: 100%;
   height: 75px;
@@ -167,73 +159,41 @@ body.stage-bg-4 #mist-overlay {
   height: 100%;
   object-fit: cover;
 }
-.card-art-placeholder {
-  font-size: 26px;
-}
+.card-art-placeholder { font-size: 26px; }
 
 .card-desc { font-size: 10.5px; color: #8b949e; line-height: 1.25; }
 .card-tag { font-size: 9px; text-transform: uppercase; font-weight: bold; color: #6e7681; }
+
 #end-turn-btn {
   padding: 10px 26px; background: #238636; border: none; border-radius: 6px;
   color: #fff; font-weight: bold; font-size: 14px; cursor: pointer;
 }
 #end-turn-btn:hover { background: #2ea043; }
+
 #log {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
   font-size: 14px; color: #f59e0b; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
 }
+
 #overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,0.88); display: none;
   flex-direction: column; align-items: center; justify-content: center; z-index: 100;
 }
 #rewards-picker { display: flex; gap: 18px; margin-top: 24px; }
 
-/* Styles Feu de Camp / Repos chez Tazuna */
 #rest-screen {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at center, #24180f 0%, #0d0a08 85%);
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 110;
-  text-align: center;
-  padding: 20px;
+  position: absolute; inset: 0; background: radial-gradient(circle at center, #24180f 0%, #0d0a08 85%);
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 110; text-align: center; padding: 20px;
 }
-.rest-options {
-  display: flex;
-  gap: 24px;
-  margin-top: 30px;
-}
+.rest-options { display: flex; gap: 24px; margin-top: 30px; }
 .rest-btn {
-  background: #1c1917;
-  border: 2px solid #78350f;
-  border-radius: 12px;
-  padding: 20px 24px;
-  width: 220px;
-  color: #fef3c7;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  background: #1c1917; border: 2px solid #78350f; border-radius: 12px; padding: 20px 24px;
+  width: 220px; color: #fef3c7; cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; transition: transform 0.15s, border-color 0.15s, background 0.15s;
 }
-.rest-btn:hover {
-  transform: translateY(-6px);
-  border-color: #f59e0b;
-  background: #292524;
-}
+.rest-btn:hover { transform: translateY(-6px); border-color: #f59e0b; background: #292524; }
 .rest-icon { font-size: 38px; }
 .rest-title { font-size: 16px; font-weight: bold; color: #f59e0b; }
 .rest-desc { font-size: 12px; color: #a8a29e; line-height: 1.4; }
-
-#upgrade-picker {
-  display: none;
-  gap: 16px;
-  flex-wrap: wrap;
-  justify-content: center;
-  max-width: 800px;
-  margin-top: 25px;
-}
+#upgrade-picker { display: none; gap: 16px; flex-wrap: wrap; justify-content: center; max-width: 800px; margin-top: 25px; }
