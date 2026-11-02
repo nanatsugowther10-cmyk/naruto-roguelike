@@ -37,7 +37,15 @@
       </div>
     </div>
     <span id="relics-bar">Relique : Aucune</span>
-    <span id="deck-info">Pioche : 0 | Défausse : 0</span>
+    <div id="deck-info">
+      <button id="btn-inspect-draw" class="pile-btn" onclick="openInspector('deck')">
+        🎴 Pioche : <span id="draw-count">0</span>
+      </button>
+      <span class="pile-separator">|</span>
+      <button id="btn-inspect-discard" class="pile-btn" onclick="openInspector('discard')">
+        🗑️ Défausse : <span id="discard-count">0</span>
+      </button>
+    </div>
   </div>
 
   <div id="stage-title" style="text-align:center; color:#f59e0b; font-weight:bold; padding:6px 0;"></div>
@@ -101,6 +109,17 @@
     <div id="upgrade-picker"></div>
   </div>
 
+  <!-- Modale Inspecteur de Cartes (Pioche / Défausse) -->
+  <div id="inspector-modal" onclick="closeInspector(event)">
+    <div class="inspector-box" onclick="event.stopPropagation()">
+      <div class="inspector-header">
+        <h3 id="inspector-title">Cartes dans la Pioche</h3>
+        <button class="inspector-close-btn" onclick="closeInspector()">✕</button>
+      </div>
+      <div id="inspector-grid"></div>
+    </div>
+  </div>
+  
   <!-- Écran de Victoire / Défaite -->
   <div id="overlay">
     <h2 id="overlay-title" style="color:#f59e0b; font-size: 26px;">VICTOIRE !</h2>
