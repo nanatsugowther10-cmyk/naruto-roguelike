@@ -183,7 +183,7 @@ function renderClones() {
   container.innerHTML = "";
   for (let i = 0; i < Math.min(state.player.clones, 4); i++) {
     const img = document.createElement("img");
-    img.src = "naruto.png";
+    img.src = "assets/characters/naruto.png";
     img.className = "clone-sprite";
     img.onerror = () => { img.style.display = "none"; };
     container.appendChild(img);
