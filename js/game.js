@@ -1,6 +1,24 @@
 // --- CACHE & PRÉCHARGEMENT D'IMAGES INSTANTANÉ ---
 const resolvedPathCache = {};
 
+// Fonction pour faire jaillir le texte animé
+function spawnFloatingText(targetBoxId, text, type = "damage") {
+  const box = document.getElementById(targetBoxId);
+  if (!box) return;
+
+  const el = document.createElement("div");
+  el.className = `floating-text float-${type}`;
+  el.innerText = text;
+
+  // Décalage aléatoire léger pour ne pas superposer les frappes multiples
+  const randomX = Math.floor(Math.random() * 30) - 15;
+  el.style.left = `calc(50% + ${randomX}px)`;
+  el.style.top = "35%";
+
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
 function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
   if (!originalPath) return;
   const filename = originalPath.split('/').pop();
