@@ -237,6 +237,7 @@ function playCard(idx) {
   else if (card.clones > 0) AudioEngine.play("clone");
   else AudioEngine.play("hit");
 
+  // Dégâts personnels (Kyûbi)
   if (card.selfDmg) {
     state.player.hp = Math.max(0, state.player.hp - card.selfDmg);
     triggerShake("naruto-box");
@@ -251,8 +252,30 @@ function playCard(idx) {
     renderClones();
   }
 
-  let dmg = card.dmg;
-  if (card.name === "Naruto Rendan") dmg += (state.player.clones * 4);
+  // Bonus passif Volonté du Feu
+  if (card.buffWill) {
+    state.player.willOfFire = true;
+    document.getElementById("log").innerText = "Volonté du Feu éveillée ! Dégâts augmentés à bas PV !";
+  }
+
+  let bonusDmg = 0;
+  if (state.player.willOfFire && state.player.hp <= (state.player.maxHp / 2)) {
+    bonusDmg += 4;
+  }
+
+  let dmg = card.dmg ? (card.dmg + bonusDmg) : 0;
+
+  // Synergie Shuriken Fûma avec clones
+  if (card.fumaBonus) {
+    if (state.player.clones >= 2) {
+      dmg = 22 + bonusDmg;
+      document.getElementById("log").innerText = "Feinte de clone ! Shuriken Fûma dévastateur !";
+    }
+  }
+
+  if (card.name === "Naruto Rendan") {
+    dmg += (state.player.clones * 4);
+  }
 
   if (dmg > 0) {
     if (state.enemy.mist && state.player.clones < 2 && Math.random() < 0.5) {
@@ -362,17 +385,25 @@ function renderHand() {
     const el = document.createElement("div");
     el.className = `card card-${card.type}`;
     el.onclick = () => playCard(i);
+
+    // Si l'image n'est pas encore présente, affiche l'émoji de repli
+    const artSrc = card.img || "";
+    const iconFallback = card.icon || "🎴";
+
     el.innerHTML = `
       <div class="card-top">
         <span class="card-title">${card.name}</span>
         <span class="card-cost">${card.cost}</span>
+      </div>
+      <div class="card-art">
+        <img src="${artSrc}" alt="${card.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <span class="card-art-placeholder" style="display:none;">${iconFallback}</span>
       </div>
       <div class="card-desc">${card.desc}</div>
       <div class="card-tag">${card.type}</div>
     `;
     h.appendChild(el);
   });
-}
 
 function updateUI() {
   document.getElementById("player-hp-txt").innerText = `${state.player.hp} / ${state.player.maxHp} PV`;
