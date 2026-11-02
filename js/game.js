@@ -1,17 +1,45 @@
-// --- MOTEUR AUDIO SYNTHÉTIQUE (Web Audio API) ---
+// --- CHARGEUR D'IMAGES INTELLIGENT (Résout la racine, assets/ ou assets/characters/ et assets/cards/) ---
+function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
+  if (!originalPath) return;
+  const filename = originalPath.split('/').pop();
+  const candidatePaths = [
+    originalPath,
+    `assets/characters/${filename}`,
+    `assets/cards/${filename}`,
+    `assets/${filename}`,
+    filename
+  ];
+  const uniquePaths = [...new Set(candidatePaths)];
+  let idx = 0;
+
+  imgElement.src = uniquePaths[0];
+  imgElement.onerror = function() {
+    idx++;
+    if (idx < uniquePaths.length) {
+      imgElement.src = uniquePaths[idx];
+    } else {
+      imgElement.onerror = null;
+      if (fallbackEmoji) {
+        imgElement.style.display = "none";
+        const placeholder = imgElement.nextElementSibling;
+        if (placeholder && placeholder.classList.contains("card-art-placeholder")) {
+          placeholder.style.display = "block";
+        }
+      }
+    }
+  };
+}
+
+// --- MOTEUR AUDIO (Web Audio API) ---
 const AudioEngine = {
   ctx: null,
-
   init() {
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AudioCtx();
     }
-    if (this.ctx.state === "suspended") {
-      this.ctx.resume();
-    }
+    if (this.ctx.state === "suspended") this.ctx.resume();
   },
-
   play(type) {
     this.init();
     const ctx = this.ctx;
@@ -25,11 +53,8 @@ const AudioEngine = {
       osc.frequency.exponentialRampToValueAtTime(30, now + 0.12);
       gain.gain.setValueAtTime(0.4, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.12);
-
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 0.12);
     } else if (type === "block") {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -38,11 +63,8 @@ const AudioEngine = {
       osc.frequency.exponentialRampToValueAtTime(90, now + 0.18);
       gain.gain.setValueAtTime(0.35, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.18);
-
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 0.18);
     } else if (type === "clone") {
       const bufferSize = ctx.sampleRate * 0.15;
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -50,21 +72,15 @@ const AudioEngine = {
       for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
       const noise = ctx.createBufferSource();
       noise.buffer = buffer;
-
       const filter = ctx.createBiquadFilter();
       filter.type = "bandpass";
       filter.frequency.setValueAtTime(800, now);
       filter.frequency.linearRampToValueAtTime(250, now + 0.15);
-
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.3, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
+      noise.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
       noise.start(now);
-
     } else if (type === "slash") {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -73,11 +89,8 @@ const AudioEngine = {
       osc.frequency.exponentialRampToValueAtTime(180, now + 0.14);
       gain.gain.setValueAtTime(0.25, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.14);
-
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 0.14);
     } else if (type === "kyubi") {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -86,10 +99,8 @@ const AudioEngine = {
       osc.frequency.linearRampToValueAtTime(45, now + 0.35);
       gain.gain.setValueAtTime(0.5, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.35);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 0.35);
     }
   }
 };
@@ -100,7 +111,7 @@ let activeRelic = null;
 let isGameOver = false;
 
 const state = {
-  player: { hp: 60, maxHp: 60, shield: 0, chakra: 3, maxChakra: 3, clones: 0 },
+  player: { hp: 60, maxHp: 60, shield: 0, chakra: 3, maxChakra: 3, clones: 0, willOfFire: false },
   enemy: { hp: 38, maxHp: 38, shield: 0, mist: false, turnCount: 1 },
   deck: [],
   hand: [],
@@ -116,24 +127,27 @@ function initGame() {
     { ...CARDS_POOL[3] },
     { ...CARDS_POOL[4] }
   ];
+
+  // Chargement garanti du sprite de Naruto
+  const narutoImg = document.getElementById("naruto-img");
+  resolveImgSrc(narutoImg, "naruto.png");
+
   loadStage(0);
 }
 
 function loadStage(index) {
   currentStageIndex = index;
   const stage = STAGES[index];
-  
+
   document.body.className = stage.bgClass;
   document.getElementById("stage-title").innerText = stage.title;
 
-  // Réinitialisation de l'ennemi
   state.enemy.hp = stage.maxHp;
   state.enemy.maxHp = stage.maxHp;
   state.enemy.shield = 0;
   state.enemy.mist = false;
   state.enemy.turnCount = 1;
 
-  // Réinitialisation du joueur pour le nouveau combat (Fix Bug Chakra & Bouclier)
   state.player.shield = 0;
   state.player.chakra = state.player.maxChakra;
   state.player.clones = 0;
@@ -144,9 +158,8 @@ function loadStage(index) {
   }
 
   const enemyImg = document.getElementById("enemy-img");
-  enemyImg.src = stage.sprite;
+  resolveImgSrc(enemyImg, stage.sprite);
 
-  // Recyclage complet des cartes (pioche + main + défausse mélangées)
   state.deck.push(...state.hand, ...state.discard);
   state.hand = [];
   state.discard = [];
@@ -183,9 +196,8 @@ function renderClones() {
   container.innerHTML = "";
   for (let i = 0; i < Math.min(state.player.clones, 4); i++) {
     const img = document.createElement("img");
-    img.src = "assets/characters/naruto.png";
     img.className = "clone-sprite";
-    img.onerror = () => { img.style.display = "none"; };
+    resolveImgSrc(img, "naruto.png");
     container.appendChild(img);
   }
   document.getElementById("player-clones-txt").innerText = `Clones actifs : ${state.player.clones}`;
@@ -204,25 +216,16 @@ function checkPlayerDeath() {
     isGameOver = true;
     state.player.hp = 0;
     updateUI();
-    showGameOverScreen();
+    const overlay = document.getElementById("overlay");
+    overlay.style.display = "flex";
+    document.getElementById("overlay-title").innerText = "DÉFAITE...";
+    document.getElementById("overlay-title").style.color = "#ef4444";
+    document.getElementById("overlay-sub").innerText = "Naruto est tombé au combat. La mission du Pays des Vagues a échoué.";
+    const picker = document.getElementById("rewards-picker");
+    picker.innerHTML = `<button id="end-turn-btn" style="padding:14px 32px; font-size:16px; background:#b91c1c;" onclick="location.reload()">Réessayer la mission</button>`;
     return true;
   }
   return false;
-}
-
-function showGameOverScreen() {
-  const overlay = document.getElementById("overlay");
-  overlay.style.display = "flex";
-  document.getElementById("overlay-title").innerText = "DÉFAITE...";
-  document.getElementById("overlay-title").style.color = "#ef4444";
-  document.getElementById("overlay-sub").innerText = "Naruto est tombé au combat. La mission du Pays des Vagues a échoué.";
-  
-  const picker = document.getElementById("rewards-picker");
-  picker.innerHTML = `
-    <button id="end-turn-btn" style="padding:14px 32px; font-size:16px; background:#b91c1c;" onclick="location.reload()">
-      Réessayer la mission
-    </button>
-  `;
 }
 
 function playCard(idx) {
@@ -237,7 +240,6 @@ function playCard(idx) {
   else if (card.clones > 0) AudioEngine.play("clone");
   else AudioEngine.play("hit");
 
-  // Dégâts personnels (Kyûbi)
   if (card.selfDmg) {
     state.player.hp = Math.max(0, state.player.hp - card.selfDmg);
     triggerShake("naruto-box");
@@ -252,28 +254,20 @@ function playCard(idx) {
     renderClones();
   }
 
-  // Bonus passif Volonté du Feu
   if (card.buffWill) {
     state.player.willOfFire = true;
-    document.getElementById("log").innerText = "Volonté du Feu éveillée ! Dégâts augmentés à bas PV !";
+    document.getElementById("log").innerText = "Volonté du Feu éveillée !";
   }
 
-  let bonusDmg = 0;
-  if (state.player.willOfFire && state.player.hp <= (state.player.maxHp / 2)) {
-    bonusDmg += 4;
-  }
-
+  let bonusDmg = (state.player.willOfFire && state.player.hp <= (state.player.maxHp / 2)) ? 4 : 0;
   let dmg = card.dmg ? (card.dmg + bonusDmg) : 0;
 
-  // Synergie Shuriken Fûma avec clones
-  if (card.fumaBonus) {
-    if (state.player.clones >= 2) {
-      dmg = 22 + bonusDmg;
-      document.getElementById("log").innerText = "Feinte de clone ! Shuriken Fûma dévastateur !";
-    }
+  if (card.fumaBonus && state.player.clones >= 2) {
+    dmg = 22 + bonusDmg;
+    document.getElementById("log").innerText = "Feinte de clone ! Shuriken Fûma dévastateur !";
   }
 
-  if (card.name === "Naruto Rendan") {
+  if (card.name.includes("Naruto Rendan")) {
     dmg += (state.player.clones * 4);
   }
 
@@ -307,7 +301,6 @@ function dealDamageToEnemy(amt) {
 function endTurn() {
   if (isGameOver || state.enemy.hp <= 0) return;
 
-  // Attaque des clones
   if (state.player.clones > 0) {
     const cDmg = state.player.clones * 3;
     dealDamageToEnemy(cDmg);
@@ -320,7 +313,6 @@ function endTurn() {
 
   if (state.enemy.hp <= 0) { handleStageVictory(); return; }
 
-  // Tour ennemi
   const stage = STAGES[currentStageIndex];
   const move = stage.pattern[(state.enemy.turnCount - 1) % stage.pattern.length];
 
@@ -352,7 +344,6 @@ function endTurn() {
 
   if (checkPlayerDeath()) return;
 
-  // Reset début de nouveau tour
   state.player.shield = 0;
   state.player.chakra = state.player.maxChakra;
   state.enemy.turnCount++;
@@ -386,24 +377,24 @@ function renderHand() {
     el.className = `card card-${card.type}`;
     el.onclick = () => playCard(i);
 
-    // Si l'image n'est pas encore présente, affiche l'émoji de repli
-    const artSrc = card.img || "";
-    const iconFallback = card.icon || "🎴";
-
     el.innerHTML = `
       <div class="card-top">
         <span class="card-title">${card.name}</span>
         <span class="card-cost">${card.cost}</span>
       </div>
       <div class="card-art">
-        <img src="${artSrc}" alt="${card.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-        <span class="card-art-placeholder" style="display:none;">${iconFallback}</span>
+        <img class="card-img-el" alt="${card.name}">
+        <span class="card-art-placeholder" style="display:none;">${card.icon || "🎴"}</span>
       </div>
       <div class="card-desc">${card.desc}</div>
       <div class="card-tag">${card.type}</div>
     `;
+
+    const imgEl = el.querySelector(".card-img-el");
+    resolveImgSrc(imgEl, card.img, card.icon);
     h.appendChild(el);
   });
+}
 
 function updateUI() {
   document.getElementById("player-hp-txt").innerText = `${state.player.hp} / ${state.player.maxHp} PV`;
@@ -425,7 +416,7 @@ function updateCounters() {
   document.getElementById("deck-info").innerText = `Pioche : ${state.deck.length} | Défausse : ${state.discard.length}`;
 }
 
-// --- FEU DE CAMP & AMÉLIORATIONS ---
+// --- FEU DE CAMP & AMÉLIORATION DE CARTES ---
 function openRestSite() {
   document.getElementById("rest-screen").style.display = "flex";
   document.getElementById("rest-choices").style.display = "flex";
@@ -433,12 +424,11 @@ function openRestSite() {
 }
 
 function takeRest() {
-  const healAmount = 25;
-  state.player.hp = Math.min(state.player.maxHp, state.player.hp + healAmount);
+  state.player.hp = Math.min(state.player.maxHp, state.player.hp + 25);
   AudioEngine.play("kyubi");
   document.getElementById("rest-screen").style.display = "none";
   updateUI();
-  loadStage(3); // Passage au Boss Final Zabuza
+  loadStage(3);
 }
 
 function openUpgradePicker() {
@@ -450,7 +440,7 @@ function openUpgradePicker() {
   const upgradable = state.deck.filter(c => !c.upgraded && (c.name === "Coup de Poing" || c.name === "Kawarimi" || c.name === "Kage Bunshin"));
 
   if (upgradable.length === 0) {
-    picker.innerHTML = `<p style="color:#ef4444;">Toutes tes cartes de base sont déjà améliorées !</p>`;
+    picker.innerHTML = `<p style="color:#ef4444;">Toutes tes techniques de base sont déjà améliorées !</p>`;
     setTimeout(() => { takeRest(); }, 1200);
     return;
   }
@@ -459,7 +449,7 @@ function openUpgradePicker() {
     const el = document.createElement("div");
     el.className = `card card-${card.type}`;
     el.style.transform = "scale(1.05)";
-    
+
     let previewDesc = "";
     if (card.name === "Coup de Poing") previewDesc = "Passe à 10 dégâts.";
     if (card.name === "Kawarimi") previewDesc = "Passe à 10 de bouclier.";
@@ -470,9 +460,16 @@ function openUpgradePicker() {
         <span class="card-title">${card.name}+</span>
         <span class="card-cost">${card.name === "Kage Bunshin" ? 1 : card.cost}</span>
       </div>
+      <div class="card-art">
+        <img class="card-img-el" alt="${card.name}">
+        <span class="card-art-placeholder" style="display:none;">${card.icon || "🎴"}</span>
+      </div>
       <div class="card-desc" style="color:#38bdf8;">${previewDesc}</div>
       <div class="card-tag">Amélioration</div>
     `;
+
+    const imgEl = el.querySelector(".card-img-el");
+    resolveImgSrc(imgEl, card.img, card.icon);
 
     el.onclick = () => {
       upgradeCard(card);
@@ -506,7 +503,6 @@ function handleStageVictory() {
   const picker = document.getElementById("rewards-picker");
   picker.innerHTML = "";
 
-  // Victoire Zabuza
   if (currentStageIndex === STAGES.length - 1) {
     document.getElementById("overlay-title").innerText = "VICTOIRE TOTALE SUR LE PAYS DES VAGUES !";
     document.getElementById("overlay-title").style.color = "#f59e0b";
@@ -515,12 +511,11 @@ function handleStageVictory() {
     return;
   }
 
-  // Victoire Haku -> Choix Relique -> Feu de camp
   if (currentStageIndex === 2) {
     document.getElementById("overlay-title").innerText = "VICTOIRE ÉLITE SUR HAKU !";
     document.getElementById("overlay-title").style.color = "#f59e0b";
     document.getElementById("overlay-sub").innerText = "Choisis un trésor ninja légendaire (Relique passive) :";
-    
+
     RELICS_POOL.forEach(relic => {
       const el = document.createElement("div");
       el.className = "card";
@@ -543,7 +538,6 @@ function handleStageVictory() {
     return;
   }
 
-  // Victoires classiques (1 et 2)
   document.getElementById("overlay-title").innerText = `Victoire sur ${STAGES[currentStageIndex].name} !`;
   document.getElementById("overlay-title").style.color = "#f59e0b";
   document.getElementById("overlay-sub").innerText = "Choisis une technique pour renforcer ton deck :";
@@ -554,9 +548,17 @@ function handleStageVictory() {
     el.style.transform = "scale(1.05)";
     el.innerHTML = `
       <div class="card-top"><span class="card-title">${reward.name}</span><span class="card-cost">${reward.cost}</span></div>
+      <div class="card-art">
+        <img class="card-img-el" alt="${reward.name}">
+        <span class="card-art-placeholder" style="display:none;">${reward.icon || "🎴"}</span>
+      </div>
       <div class="card-desc">${reward.desc}</div>
       <div class="card-tag">${reward.type}</div>
     `;
+
+    const imgEl = el.querySelector(".card-img-el");
+    resolveImgSrc(imgEl, reward.img, reward.icon);
+
     el.onclick = () => {
       state.deck.push({ ...reward });
       overlay.style.display = "none";
