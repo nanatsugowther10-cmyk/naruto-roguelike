@@ -53,18 +53,23 @@ const STAGES = [
   }
 ];
 
+// Cartes de départ (Deck de base)
 const CARDS_POOL = [
-  { name: "Coup de Poing", cost: 1, type: "taijutsu", dmg: 6, shield: 0, clones: 0, desc: "Inflige 6 dégâts physiques." },
-  { name: "Kawarimi", cost: 1, type: "taijutsu", dmg: 0, shield: 6, clones: 0, desc: "Bûche de substitution (+6 bouclier)." },
-  { name: "Kage Bunshin", cost: 2, type: "clones", dmg: 0, shield: 0, clones: 2, desc: "+2 Clones (+3 dégâts chacun en fin de tour)." },
-  { name: "Naruto Rendan", cost: 2, type: "clones", dmg: 8, shield: 0, clones: 0, desc: "8 dégâts + 4 par clone actif." },
-  { name: "Rage du Démon", cost: 0, type: "kyubi", dmg: 14, selfDmg: 4, shield: 0, clones: 0, desc: "Perds 4 PV. Inflige 14 dégâts immédiats." }
+  { name: "Coup de Poing", cost: 1, type: "taijutsu", dmg: 6, shield: 0, clones: 0, icon: "👊", img: "card_poing.png", desc: "Inflige 6 dégâts physiques." },
+  { name: "Kawarimi", cost: 1, type: "taijutsu", dmg: 0, shield: 6, clones: 0, icon: "🪵", img: "card_kawarimi.png", desc: "Substitution (+6 bouclier)." },
+  { name: "Kage Bunshin", cost: 2, type: "clones", dmg: 0, shield: 0, clones: 2, icon: "👥", img: "card_clones.png", desc: "+2 Clones (+3 dégâts chacun en fin de tour)." },
+  { name: "Naruto Rendan", cost: 2, type: "clones", dmg: 8, shield: 0, clones: 0, icon: "🌀", img: "card_rendan.png", desc: "8 dégâts + 4 par clone actif." },
+  { name: "Rage du Démon", cost: 0, type: "kyubi", dmg: 14, selfDmg: 4, shield: 0, clones: 0, icon: "🦊", img: "card_kyubi.png", desc: "Perds 4 PV. Inflige 14 dégâts immédiats." }
 ];
 
+// Cartes récompenses déblocables au fil des victoires
 const REWARD_OPTIONS = [
-  { name: "Combo 2000 Poings", cost: 1, type: "taijutsu", dmg: 10, shield: 0, clones: 0, desc: "Frappe de taijutsu lourde (+10 dégâts)." },
-  { name: "Assaut Massif", cost: 2, type: "clones", dmg: 0, shield: 0, clones: 3, desc: "Invoque 3 clones d'un coup sur le terrain." },
-  { name: "Chakra Rouge", cost: 0, type: "kyubi", dmg: 0, selfDmg: 5, chakraGain: 2, desc: "Perds 5 PV. Gagne immédiatement +2 Chakra." }
+  { name: "Shuriken Fûma", cost: 2, type: "tactique", dmg: 12, fumaBonus: true, icon: "⚔️", img: "card_fuma.png", desc: "12 dégâts. Passe à 22 dégâts si tu as 2+ clones !" },
+  { name: "Volonté du Feu", cost: 1, type: "tactique", buffWill: true, icon: "🔥", img: "card_volonte.png", desc: "+4 dégâts à toutes tes attaques tant que PV < 50%." },
+  { name: "Combo 2000 Poings", cost: 1, type: "taijutsu", dmg: 10, shield: 0, clones: 0, icon: "💥", img: "card_2000poings.png", desc: "Frappe de taijutsu lourde (+10 dégâts)." },
+  { name: "Assaut Massif", cost: 2, type: "clones", dmg: 0, shield: 0, clones: 3, icon: "🌪️", img: "card_assaut.png", desc: "Invoque immédiatement 3 clones sur le terrain." },
+  { name: "Chakra Rouge", cost: 0, type: "kyubi", dmg: 0, selfDmg: 5, chakraGain: 2, icon: "🔴", img: "card_chakra_rouge.png", desc: "Perds 5 PV. Gagne +2 Chakra immédiatement." },
+  { name: "Miroir Démoniaque", cost: 1, type: "tactique", shield: 10, mirrorReflect: true, icon: "🪞", img: "card_miroir.png", desc: "+10 Bouclier. Renvoie la moitié des dégâts bloqués ce tour." }
 ];
 
 const RELICS_POOL = [
