@@ -23,7 +23,7 @@
     <div class="fighter">
       <div class="sprite-stage" id="naruto-box">
         <div id="clones-container"></div>
-        <img ssrc="assets/characters/naruto.png" class="fighter-img" id="naruto-img" alt="Naruto" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><text y=\'50%\' x=\'50%\' dominant-baseline=\'central\' text-anchor=\'middle\' font-size=\'60\'>🍥</text></svg>';">
+        <img src="assets/characters/naruto.png" class="fighter-img" id="naruto-img" alt="Naruto">
         <div class="ground-shadow"></div>
       </div>
       <div class="bar-container"><div id="player-hp-bar" class="bar-fill hp-fill" style="width: 100%;"></div></div>
@@ -36,7 +36,7 @@
     <div class="fighter">
       <div class="intent-bubble" id="enemy-intent">Prépare une attaque</div>
       <div class="sprite-stage" id="enemy-box">
-        <img src="assets/characters/brigand.png" class="fighter-img" id="enemy-img" alt="Ennemi" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><text y=\'50%\' x=\'50%\' dominant-baseline=\'central\' text-anchor=\'middle\' font-size=\'60\'>🥷</text></svg>';">
+        <img src="assets/characters/brigand.png" class="fighter-img" id="enemy-img" alt="Ennemi">
         <div class="ground-shadow"></div>
       </div>
       <div class="bar-container"><div id="enemy-hp-bar" class="bar-fill hp-fill" style="width: 100%;"></div></div>
@@ -55,7 +55,7 @@
   <div id="rest-screen">
     <h2 style="color: #f59e0b; font-size: 28px;">Maison de Tazuna (Feu de camp)</h2>
     <p style="color: #d6d3d1; margin-top: 8px; max-width: 500px;">
-      Après le rude combat contre Haku, l'équipe se regroupe avant le combat décisif sur le pont. Fais ton choix :
+      Après le rude combat contre Haku, l'équipe se regroupe avant le duel décisif sur le pont. Fais ton choix :
     </p>
 
     <div class="rest-options" id="rest-choices">
@@ -67,20 +67,20 @@
       <div class="rest-btn" onclick="openUpgradePicker()">
         <span class="rest-icon">⚡</span>
         <span class="rest-title">Entraînement Chakra</span>
-        <span class="rest-desc">Améliore une technique de ton deck en version puissante (+).</span>
+        <span class="rest-desc">Améliore une technique de base en version renforcée (+).</span>
       </div>
     </div>
 
     <div id="upgrade-picker"></div>
   </div>
 
+  <!-- Écran de Victoire / Défaite -->
   <div id="overlay">
     <h2 id="overlay-title" style="color:#f59e0b; font-size: 26px;">VICTOIRE !</h2>
     <p id="overlay-sub" style="color:#8b949e; margin-top: 6px;">Choisis ta récompense :</p>
     <div id="rewards-picker"></div>
   </div>
 
-  <!-- Scripts modulaires -->
   <script src="js/data.js"></script>
   <script src="js/game.js"></script>
 </body>
