@@ -160,11 +160,17 @@ const AudioEngine = {
     if (this.currentTrack === filename) return;
     this.currentTrack = filename;
 
+    const baseName = filename.replace(/\.(m4a|mp3)$/, "");
     const targetVolume = this.settings.master * this.settings.music;
+
+    // Teste .m4a d'abord, puis .mp3 dans tous les dossiers possibles
     const candidatePaths = [
-      `assets/audio/${filename}`,
-      `assets/${filename}`,
-      filename
+      `assets/audio/${baseName}.m4a`,
+      `assets/${baseName}.m4a`,
+      `${baseName}.m4a`,
+      `assets/audio/${baseName}.mp3`,
+      `assets/${baseName}.mp3`,
+      `${baseName}.mp3`
     ];
 
     if (this.musicAudio) {
@@ -178,6 +184,7 @@ const AudioEngine = {
 
     let pathIdx = 0;
     audio.src = candidatePaths[pathIdx];
+
     audio.onerror = () => {
       pathIdx++;
       if (pathIdx < candidatePaths.length) {
@@ -186,7 +193,9 @@ const AudioEngine = {
       }
     };
 
-    audio.play().catch(() => {});
+    audio.play().catch(() => {
+      // Bloqué par le navigateur tant qu'il n'y a pas eu de clic utilisateur
+    });
     this.musicAudio = audio;
   },
 
