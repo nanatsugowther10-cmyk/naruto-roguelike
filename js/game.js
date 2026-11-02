@@ -348,9 +348,9 @@ function loadStage(index) {
 
   // Lancement de la musique correspondante
   if (index <= 1) {
-    AudioEngine.playMusic("combat1.mp3");
+    AudioEngine.playMusic("first_level.m4a");
   } else {
-    AudioEngine.playMusic("combat2.mp3");
+    AudioEngine.playMusic("second_level.m4a");
   }
 
   // Initialisation de l'ennemi
@@ -910,6 +910,7 @@ function hasSavedGame() {
 }
 
 function continueGame() {
+  AudioEngine.init();
   const raw = localStorage.getItem(SAVE_KEY);
   if (!raw) return;
   const data = JSON.parse(raw);
@@ -931,6 +932,7 @@ function continueGame() {
 }
 
 function startNewGamePrompt() {
+  AudioEngine.init();
   clearSave();
   document.getElementById("main-menu").style.display = "none";
   initNewGame();
@@ -1007,7 +1009,17 @@ function updateDisplaySettings() {
 // ==========================================
 window.onload = () => {
   preloadAllAssets();
-  AudioEngine.playMusic("title.mp3");
+  
+  // Prépare le morceau du menu
+  AudioEngine.playMusic("main_menu.m4a");
+  
+  // Si le navigateur bloque l'autoplay, le premier clic n'importe où lance la musique
+  document.addEventListener("click", () => {
+    AudioEngine.init();
+    if (AudioEngine.musicAudio && AudioEngine.musicAudio.paused) {
+      AudioEngine.musicAudio.play().catch(() => {});
+    }
+  }, { once: true });
 
   if (hasSavedGame()) {
     const btnContinue = document.getElementById("btn-continue");
