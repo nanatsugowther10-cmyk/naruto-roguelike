@@ -335,14 +335,25 @@ function playCard(idx) {
 
 function dealDamageToEnemy(amt) {
   triggerShake("enemy-box");
+  let directHpDmg = amt;
+
   if (state.enemy.shield > 0) {
     if (amt <= state.enemy.shield) {
-      state.enemy.shield -= amt; amt = 0;
+      state.enemy.shield -= amt;
+      spawnFloatingText("enemy-box", `-${amt}`, "shield");
+      directHpDmg = 0;
     } else {
-      amt -= state.enemy.shield; state.enemy.shield = 0;
+      const absorbed = state.enemy.shield;
+      directHpDmg = amt - absorbed;
+      state.enemy.shield = 0;
+      spawnFloatingText("enemy-box", `-${absorbed}`, "shield");
     }
   }
-  state.enemy.hp = Math.max(0, state.enemy.hp - amt);
+
+  if (directHpDmg > 0) {
+    state.enemy.hp = Math.max(0, state.enemy.hp - directHpDmg);
+    spawnFloatingText("enemy-box", `-${directHpDmg}`, "damage");
+  }
 }
 
 function endTurn() {
@@ -400,15 +411,24 @@ function endTurn() {
 
 function hitPlayer(amt) {
   triggerShake("naruto-box");
+  let directHpDmg = amt;
+
   if (state.player.shield > 0) {
     if (amt <= state.player.shield) {
-      state.player.shield -= amt; amt = 0;
+      state.player.shield -= amt;
+      spawnFloatingText("naruto-box", `-${amt}`, "shield");
+      directHpDmg = 0;
     } else {
-      amt -= state.player.shield; state.player.shield = 0;
+      const absorbed = state.player.shield;
+      directHpDmg = amt - absorbed;
+      state.player.shield = 0;
+      spawnFloatingText("naruto-box", `-${absorbed}`, "shield");
     }
   }
-  if (amt > 0) {
-    state.player.hp = Math.max(0, state.player.hp - amt);
+
+  if (directHpDmg > 0) {
+    state.player.hp = Math.max(0, state.player.hp - directHpDmg);
+    spawnFloatingText("naruto-box", `-${directHpDmg}`, "damage");
     if (activeRelic && activeRelic.onDamage) activeRelic.onDamage(state);
   }
   checkPlayerDeath();
@@ -473,6 +493,7 @@ function openRestSite() {
 function takeRest() {
   state.player.hp = Math.min(state.player.maxHp, state.player.hp + 25);
   AudioEngine.play("kyubi");
+  spawnFloatingText("naruto-box", "+25", "heal");
   document.getElementById("rest-screen").style.display = "none";
   updateUI();
   loadStage(3);
