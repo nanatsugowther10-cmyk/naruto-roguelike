@@ -213,6 +213,7 @@ let currentStageIndex = 0;
 let activeRelic = null;
 let isGameOver = false;
 let busy = false;
+let atRest = false;
 
 const state = {
   player: { hp: 60, maxHp: 60, shield: 0, chakra: 3, maxChakra: 3, clones: 0, willOfFire: false },
@@ -340,7 +341,8 @@ function loadStage(index) {
   currentStageIndex = index;
   const stage = STAGES[index];
 
-  updateNodeMap(index);
+  atRest = false;
+  updateNodeMap(index >= 3 ? 4 : index);
   document.body.className = stage.bgClass;
 
   const stageTitle = document.getElementById("stage-title");
@@ -644,7 +646,7 @@ function updateUI() {
   document.getElementById("chakra-display").innerText = `Chakra : ${state.player.chakra} / ${state.player.maxChakra}`;
 
   const stage = STAGES[currentStageIndex];
-  const nextMove = stage.pattern[state.enemy.turnCount % stage.pattern.length];
+  const nextMove = stage.pattern[(state.enemy.turnCount - 1) % stage.pattern.length];
   const intentEl = document.getElementById("enemy-intent");
   if (intentEl) intentEl.innerText = `Prépare : ${nextMove.intent}`;
 
@@ -716,6 +718,13 @@ function closeInspector(event) {
 // ==========================================
 function openRestSite() {
   updateNodeMap(3);
+  // Ramène main + défausse dans le deck (sinon le choix d'amélioration et la sauvegarde sont incomplets)
+  state.deck.push(...state.hand, ...state.discard);
+  state.hand = [];
+  state.discard = [];
+  atRest = true;
+  updateCounters();
+  renderHand();
   saveGame();
 
   const restScreen = document.getElementById("rest-screen");
@@ -896,6 +905,7 @@ function saveGame() {
     playerHp: state.player.hp,
     playerMaxHp: state.player.maxHp,
     playerWillOfFire: state.player.willOfFire,
+    atRest,
     deck: state.deck
   };
   localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
@@ -928,6 +938,14 @@ function continueGame() {
   }
 
   document.getElementById("main-menu").style.display = "none";
+  if (data.atRest) {
+    currentStageIndex = data.currentStageIndex;
+    state.hand = [];
+    state.discard = [];
+    updateUI();
+    openRestSite();
+    return;
+  }
   loadStage(data.currentStageIndex);
 }
 
