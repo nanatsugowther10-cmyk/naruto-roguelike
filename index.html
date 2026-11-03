@@ -2,16 +2,14 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Naruto: Chroniques Ninja (Pays des Vagues)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Naruto - Chroniques du Pays des Vagues</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="stage-bg-1">
+<body class="bg-port">
 
-  <div id="mist-overlay"></div>
-
-  <!-- BARRE SUPÉRIEURE UNIQUE & ÉPURÉE -->
+  <!-- BARRE SUPÉRIEURE : Progression, Reliques, Piles & Paramètres -->
   <div id="top-bar">
-    <!-- 1. Gauche : Frise de progression -->
     <div id="node-map">
       <div class="node active" id="node-0">
         <span class="node-icon">⚓</span>
@@ -39,12 +37,10 @@
       </div>
     </div>
 
-    <!-- 2. Centre : Titre de mission et Reliques -->
     <div id="top-bar-center">
       <span id="relics-bar">Relique : Aucune</span>
     </div>
 
-    <!-- 3. Droite : Pioche, Défausse & Options -->
     <div id="top-bar-right">
       <div id="deck-info">
         <button id="btn-inspect-draw" class="pile-btn" onclick="openInspector('deck')">
@@ -59,93 +55,133 @@
     </div>
   </div>
 
-  <div id="stage-title" style="text-align:center; color:#f59e0b; font-weight:bold; padding:6px 0;"></div>
-
-  <div id="combat-zone">
-    <div id="battle-floor"></div>
+  <!-- EN-TÊTE DU COMBAT & LOG -->
+  <header>
+    <h2 id="stage-title">Étape 1/4 : Port de Nami no Kuni</h2>
     <div id="log">À toi de jouer, Naruto !</div>
+  </header>
 
-    <!-- Naruto & Clones -->
-    <div class="fighter">
-      <div class="sprite-stage" id="naruto-box">
+  <!-- ZONE DE COMBAT -->
+  <main id="combat-zone">
+    <!-- Box Joueur (Naruto) -->
+    <div class="fighter-box" id="naruto-box">
+      <div class="sprite-container">
+        <img id="naruto-img" class="fighter-sprite" alt="Naruto Uzumaki">
         <div id="clones-container"></div>
-        <img src="assets/characters/naruto.png" class="fighter-img" id="naruto-img" alt="Naruto">
-        <div class="ground-shadow"></div>
       </div>
-      <div class="bar-container"><div id="player-hp-bar" class="bar-fill hp-fill" style="width: 100%;"></div></div>
-      <div id="player-hp-txt">60 / 60 PV</div>
-      <div class="shield-badge" id="player-shield">Bouclier : 0</div>
-      <div style="font-size: 13px; color: #f59e0b; font-weight: bold;" id="player-clones-txt">Clones actifs : 0</div>
+      <div class="status-panel">
+        <div class="fighter-name">Naruto Uzumaki</div>
+        <div class="hp-bar-bg">
+          <div id="player-hp-bar" class="hp-bar-fill"></div>
+        </div>
+        <div id="player-hp-txt" class="hp-text">60 / 60 PV</div>
+        <div id="player-shield" class="shield-text">Bouclier : 0</div>
+        <div id="player-clones-txt" class="clones-text">Clones actifs : 0</div>
+      </div>
     </div>
 
-    <!-- Ennemi -->
-    <div class="fighter">
-      <div class="intent-bubble" id="enemy-intent">Prépare une attaque</div>
-      <div class="sprite-stage" id="enemy-box">
-        <img src="assets/characters/brigand.png" class="fighter-img" id="enemy-img" alt="Ennemi">
-        <div class="ground-shadow"></div>
+    <!-- Box Ennemi -->
+    <div class="fighter-box" id="enemy-box">
+      <div class="intent-badge" id="enemy-intent">Prépare une attaque</div>
+      <div class="sprite-container">
+        <img id="enemy-img" class="fighter-sprite" alt="Ennemi">
       </div>
-      <div class="bar-container"><div id="enemy-hp-bar" class="bar-fill hp-fill" style="width: 100%;"></div></div>
-      <div id="enemy-hp-txt">38 / 38 PV</div>
-      <div class="shield-badge" id="enemy-shield">Bouclier : 0</div>
+      <div class="status-panel">
+        <div id="enemy-name" class="fighter-name">Brigands du Port</div>
+        <div class="hp-bar-bg">
+          <div id="enemy-hp-bar" class="hp-bar-fill enemy-hp-fill"></div>
+        </div>
+        <div id="enemy-hp-txt" class="hp-text">38 / 38 PV</div>
+        <div id="enemy-shield" class="shield-text">Bouclier : 0</div>
+      </div>
     </div>
-  </div>
+  </main>
 
-  <div id="hand-zone">
+  <!-- BAS D'ÉCRAN : Chakra, Main de cartes & Fin de tour -->
+  <footer>
     <div id="chakra-display">Chakra : 3 / 3</div>
     <div id="hand"></div>
     <button id="end-turn-btn" onclick="endTurn()">Fin du tour</button>
-  </div>
+  </footer>
 
-  <!-- Écran de Repos / Feu de camp chez Tazuna -->
+  <!-- REPOS CHEZ TAZUNA -->
   <div id="rest-screen">
-    <h2 style="color: #f59e0b; font-size: 28px;">Maison de Tazuna (Feu de camp)</h2>
-    <p style="color: #d6d3d1; margin-top: 8px; max-width: 500px;">
-      Après le rude combat contre Haku, l'équipe se regroupe avant le duel décisif sur le pont. Fais ton choix :
-    </p>
-
-    <div class="rest-options" id="rest-choices">
-      <div class="rest-btn" onclick="takeRest()">
-        <span class="rest-icon">🍜</span>
-        <span class="rest-title">Ramen de Tsunami</span>
-        <span class="rest-desc">Restaure 25 PV immédiatement.</span>
+    <div class="rest-box">
+      <h2>Maison de Tazuna (Feu de Camp)</h2>
+      <p>Repose-toi et prépare-toi pour l'affrontement décisif sur le pont.</p>
+      <div id="rest-choices">
+        <button class="menu-btn primary-btn" onclick="takeRest()">Dormir (+25 PV)</button>
+        <button class="menu-btn" onclick="openUpgradePicker()">Forger une technique (+)</button>
       </div>
-      <div class="rest-btn" onclick="openUpgradePicker()">
-        <span class="rest-icon">⚡</span>
-        <span class="rest-title">Entraînement Chakra</span>
-        <span class="rest-desc">Améliore une technique de base en version renforcée (+).</span>
-      </div>
+      <div id="upgrade-picker" style="display:none;"></div>
     </div>
-
-    <div id="upgrade-picker"></div>
   </div>
 
-  <!-- Modale Inspecteur de Cartes (Pioche / Défausse) -->
+  <!-- OVERLAY VICTOIRE / RÉCOMPENSES / DÉFAITE -->
+  <div id="overlay">
+    <div class="modal-box">
+      <h2 id="overlay-title">Victoire !</h2>
+      <p id="overlay-sub">Choisis une récompense :</p>
+      <div id="rewards-picker"></div>
+    </div>
+  </div>
+
+  <!-- MODALE INSPECTEUR DE CARTES -->
   <div id="inspector-modal" onclick="closeInspector(event)">
     <div class="inspector-box" onclick="event.stopPropagation()">
       <div class="inspector-header">
-        <h3 id="inspector-title">Cartes dans la Pioche</h3>
+        <h3 id="inspector-title">Cartes</h3>
         <button class="inspector-close-btn" onclick="closeInspector()">✕</button>
       </div>
       <div id="inspector-grid"></div>
     </div>
   </div>
-  
-  <!-- Écran de Victoire / Défaite -->
-  <div id="overlay">
-    <h2 id="overlay-title" style="color:#f59e0b; font-size: 26px;">VICTOIRE !</h2>
-    <p id="overlay-sub" style="color:#8b949e; margin-top: 6px;">Choisis ta récompense :</p>
-    <div id="rewards-picker"></div>
+
+  <!-- MODALE DES PARAMÈTRES -->
+  <div id="settings-modal" onclick="closeSettingsModal(event)">
+    <div class="settings-box" onclick="event.stopPropagation()">
+      <div class="settings-header">
+        <h3>Paramètres du Jeu</h3>
+        <button class="inspector-close-btn" onclick="closeSettingsModal()">✕</button>
+      </div>
+      <div class="settings-body">
+        <div class="setting-group">
+          <label>Volume Général : <span id="val-vol-master">80%</span></label>
+          <input type="range" id="vol-master" min="0" max="1" step="0.05" value="0.8" oninput="updateAudioSettings()">
+        </div>
+        <div class="setting-group">
+          <label>Volume Musique : <span id="val-vol-music">40%</span></label>
+          <input type="range" id="vol-music" min="0" max="1" step="0.05" value="0.4" oninput="updateAudioSettings()">
+        </div>
+        <div class="setting-group">
+          <label>Volume Effets Sonores (SFX) : <span id="val-vol-sfx">80%</span></label>
+          <input type="range" id="vol-sfx" min="0" max="1" step="0.05" value="0.8" oninput="updateAudioSettings()">
+        </div>
+        <hr class="setting-divider">
+        <div class="setting-group">
+          <label>Taille des cartes : <span id="val-card-size">100%</span></label>
+          <input type="range" id="card-size" min="0.8" max="1.25" step="0.05" value="1" oninput="updateDisplaySettings()">
+        </div>
+        <div class="setting-group">
+          <label>Taille du texte :</label>
+          <select id="font-size-select" onchange="updateDisplaySettings()">
+            <option value="small">Compacte</option>
+            <option value="medium" selected>Normale</option>
+            <option value="large">Grande</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-footer">
+        <button class="menu-btn" style="padding: 8px 22px; font-size: 13px;" onclick="closeSettingsModal()">Fermer</button>
+      </div>
+    </div>
   </div>
 
-  <script src="js/data.js"></script>
-  <script src="js/game.js"></script>
-<!-- Écran du Menu Principal -->
+  <!-- MENU PRINCIPAL -->
   <div id="main-menu">
     <div class="menu-content">
       <h1 class="menu-title">NARUTO</h1>
-      <h2 class="menu-subtitle">CHRONIQUES DU PAYS DES VAGUES</h2>
-      
+      <h2 class="menu-subtitle">Chroniques du Pays des Vagues</h2>
       <div class="menu-buttons">
         <button id="btn-continue" class="menu-btn" onclick="continueGame()" style="display: none;">Continuer la mission</button>
         <button class="menu-btn primary-btn" onclick="startNewGamePrompt()">Nouvelle Partie</button>
@@ -154,52 +190,7 @@
     </div>
   </div>
 
-  <!-- Modale des Paramètres / Options -->
-  <div id="settings-modal" onclick="closeSettingsModal(event)">
-    <div class="settings-box" onclick="event.stopPropagation()">
-      <div class="settings-header">
-        <h3>Paramètres du Jeu</h3>
-        <button class="inspector-close-btn" onclick="closeSettingsModal()">✕</button>
-      </div>
-
-      <div class="settings-body">
-        <div class="setting-group">
-          <label>Volume Général : <span id="val-vol-master">80%</span></label>
-          <input type="range" id="vol-master" min="0" max="1" step="0.05" value="0.8" oninput="updateAudioSettings()">
-        </div>
-
-        <div class="setting-group">
-          <label>Volume Musique : <span id="val-vol-music">40%</span></label>
-          <input type="range" id="vol-music" min="0" max="1" step="0.05" value="0.4" oninput="updateAudioSettings()">
-        </div>
-
-        <div class="setting-group">
-          <label>Volume Effets Sonores (SFX) : <span id="val-vol-sfx">80%</span></label>
-          <input type="range" id="vol-sfx" min="0" max="1" step="0.05" value="0.8" oninput="updateAudioSettings()">
-        </div>
-
-        <hr class="setting-divider">
-
-        <div class="setting-group">
-          <label>Taille des cartes : <span id="val-card-size">Normale (100%)</span></label>
-          <input type="range" id="card-size" min="0.85" max="1.25" step="0.05" value="1" oninput="updateDisplaySettings()">
-        </div>
-
-        <div class="setting-group">
-          <label>Taille du texte : <span id="val-font-size">Normale</span></label>
-          <select id="font-size-select" onchange="updateDisplaySettings()">
-            <option value="small">Compacte</option>
-            <option value="medium" selected>Normale</option>
-            <option value="large">Grande</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="settings-footer">
-        <button class="menu-btn" style="padding: 8px 24px; font-size: 14px;" onclick="closeSettingsModal()">Fermer</button>
-      </div>
-    </div>
-  </div>
-  
+  <script src="js/cards.js"></script>
+  <script src="js/game.js"></script>
 </body>
 </html>

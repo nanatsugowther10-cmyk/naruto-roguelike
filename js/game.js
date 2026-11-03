@@ -60,7 +60,7 @@ function preloadAllAssets() {
 }
 
 // ==========================================
-// 2. MOTEUR AUDIO (SFX & MUSIQUES)
+// 2. MOTEUR AUDIO (M4A & MP3 DYNAMIQUES)
 // ==========================================
 const AudioEngine = {
   ctx: null,
@@ -95,10 +95,8 @@ const AudioEngine = {
       osc.frequency.exponentialRampToValueAtTime(30, now + 0.12);
       gain.gain.setValueAtTime(0.4 * sfxVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.12);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 0.12);
     } else if (type === "block") {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -107,10 +105,8 @@ const AudioEngine = {
       osc.frequency.exponentialRampToValueAtTime(90, now + 0.18);
       gain.gain.setValueAtTime(0.35 * sfxVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.18);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 0.18);
     } else if (type === "clone") {
       const bufferSize = ctx.sampleRate * 0.15;
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -125,9 +121,7 @@ const AudioEngine = {
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.3 * sfxVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
+      noise.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
       noise.start(now);
     } else if (type === "slash") {
       const osc = ctx.createOscillator();
@@ -137,10 +131,8 @@ const AudioEngine = {
       osc.frequency.exponentialRampToValueAtTime(180, now + 0.14);
       gain.gain.setValueAtTime(0.25 * sfxVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.14);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 0.14);
     } else if (type === "kyubi") {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -149,10 +141,8 @@ const AudioEngine = {
       osc.frequency.linearRampToValueAtTime(45, now + 0.35);
       gain.gain.setValueAtTime(0.5 * sfxVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.35);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 0.35);
     }
   },
 
@@ -163,7 +153,6 @@ const AudioEngine = {
     const baseName = filename.replace(/\.(m4a|mp3)$/, "");
     const targetVolume = this.settings.master * this.settings.music;
 
-    // Teste .m4a d'abord, puis .mp3 dans tous les dossiers possibles
     const candidatePaths = [
       `assets/audio/${baseName}.m4a`,
       `assets/${baseName}.m4a`,
@@ -193,9 +182,7 @@ const AudioEngine = {
       }
     };
 
-    audio.play().catch(() => {
-      // Bloqué par le navigateur tant qu'il n'y a pas eu de clic utilisateur
-    });
+    audio.play().catch(() => {});
     this.musicAudio = audio;
   },
 
@@ -207,24 +194,34 @@ const AudioEngine = {
 };
 
 // ==========================================
-// 3. ÉTAT DU JEU & VARIABLES GLOBALES
+// 3. ÉTAT GLOBAL
 // ==========================================
 let currentStageIndex = 0;
 let activeRelic = null;
 let isGameOver = false;
 let busy = false;
-let atRest = false;
 
 const state = {
-  player: { hp: 60, maxHp: 60, shield: 0, chakra: 3, maxChakra: 3, clones: 0, willOfFire: false },
+  player: {
+    hp: 60,
+    maxHp: 60,
+    shield: 0,
+    chakra: 3,
+    maxChakra: 3,
+    clones: 0,
+    willOfFire: false,
+    cardsPlayedThisTurn: 0,
+    nextAttackFree: false
+  },
   enemy: { hp: 38, maxHp: 38, shield: 0, mist: false, turnCount: 1 },
   deck: [],
   hand: [],
-  discard: []
+  discard: [],
+  exhausted: []
 };
 
 // ==========================================
-// 4. GESTION DES ANIMATIONS & VISUELS (VFX)
+// 4. ANIMATIONS & VISUELS (VFX)
 // ==========================================
 function spawnFloatingText(targetBoxId, text, type = "damage") {
   const box = document.getElementById(targetBoxId);
@@ -312,7 +309,7 @@ function renderClones() {
 }
 
 // ==========================================
-// 5. GESTION DES COMBATS & DES ÉTAPES
+// 5. GESTION DU COMBAT & DES NIVEAUX
 // ==========================================
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -341,31 +338,45 @@ function loadStage(index) {
   currentStageIndex = index;
   const stage = STAGES[index];
 
-  atRest = false;
-  updateNodeMap(index >= 3 ? 4 : index);
+  busy = false;
+  isGameOver = false;
+
+  updateNodeMap(index);
   document.body.className = stage.bgClass;
 
   const stageTitle = document.getElementById("stage-title");
   if (stageTitle) stageTitle.innerText = stage.title;
 
-  // Lancement de la musique correspondante
+  const enemyName = document.getElementById("enemy-name");
+  if (enemyName) enemyName.innerText = stage.name;
+
   if (index <= 1) {
     AudioEngine.playMusic("first_level.m4a");
   } else {
     AudioEngine.playMusic("second_level.m4a");
   }
 
-  // Initialisation de l'ennemi
+  // Remettre toutes les cartes en deck (sauf les fléaux temporaires)
+  state.deck.push(...state.hand, ...state.discard, ...state.exhausted);
+  state.hand = [];
+  state.discard = [];
+  state.exhausted = [];
+  state.deck = state.deck.filter(c => !c.isCurse);
+  shuffle(state.deck);
+
+  // Réinitialisation stricte de l'ennemi
   state.enemy.hp = stage.maxHp;
   state.enemy.maxHp = stage.maxHp;
   state.enemy.shield = 0;
   state.enemy.mist = false;
   state.enemy.turnCount = 1;
 
-  // Initialisation du tour du joueur
+  // Réinitialisation du joueur
   state.player.shield = 0;
   state.player.chakra = state.player.maxChakra;
   state.player.clones = 0;
+  state.player.cardsPlayedThisTurn = 0;
+  state.player.nextAttackFree = false;
   renderClones();
 
   if (activeRelic && activeRelic.onCombatStart) {
@@ -375,14 +386,7 @@ function loadStage(index) {
   const enemyImg = document.getElementById("enemy-img");
   if (enemyImg) resolveImgSrc(enemyImg, stage.sprite);
 
-  // Remise en deck de toutes les cartes
-  state.deck.push(...state.hand, ...state.discard);
-  state.hand = [];
-  state.discard = [];
-  shuffle(state.deck);
-
   saveGame();
-
   drawCards(4);
   updateUI();
 
@@ -390,11 +394,11 @@ function loadStage(index) {
   if (logEl) logEl.innerText = `Combat : ${stage.name} !`;
 }
 
-function dealDamageToEnemy(amt) {
+function dealDamageToEnemy(amt, piercing = false) {
   triggerShake("enemy-box");
   let directHpDmg = amt;
 
-  if (state.enemy.shield > 0) {
+  if (!piercing && state.enemy.shield > 0) {
     if (amt <= state.enemy.shield) {
       state.enemy.shield -= amt;
       spawnFloatingText("enemy-box", `-${amt}`, "shield");
@@ -449,23 +453,56 @@ function checkPlayerDeath() {
     overlay.style.display = "flex";
     document.getElementById("overlay-title").innerText = "DÉFAITE...";
     document.getElementById("overlay-title").style.color = "#ef4444";
-    document.getElementById("overlay-sub").innerText = "Naruto est tombé au combat. La mission du Pays des Vagues a échoué.";
+    document.getElementById("overlay-sub").innerText = "Naruto est tombé au combat. La mission a échoué.";
     const picker = document.getElementById("rewards-picker");
-    picker.innerHTML = `<button id="end-turn-btn" style="padding:14px 32px; font-size:16px; background:#b91c1c;" onclick="location.reload()">Retourner au Menu</button>`;
+    picker.innerHTML = `<button id="end-turn-btn" style="padding:12px 28px; font-size:15px; background:#b91c1c;" onclick="location.reload()">Retourner au Menu</button>`;
     return true;
   }
   return false;
 }
 
+// ==========================================
+// 6. GESTION DU JEU DES CARTES
+// ==========================================
 function playCard(idx) {
   if (isGameOver || busy) return;
   const card = state.hand[idx];
-  if (!card || state.player.chakra < card.cost) return;
+  if (!card) return;
 
-  state.player.chakra -= card.cost;
+  // Calcul du coût avec bonus Ouverture
+  let effectiveCost = card.cost;
+  if ((card.type === "attaque" || card.type === "taijutsu") && state.player.nextAttackFree) {
+    effectiveCost = 0;
+  }
 
-  // Effets d'impact et sons
-  if (card.type === "kyubi") {
+  if (state.player.chakra < effectiveCost) {
+    document.getElementById("log").innerText = "Pas assez de Chakra !";
+    return;
+  }
+
+  // Vérification de sacrifice de clone
+  if (card.cloneCost && state.player.clones < card.cloneCost) {
+    document.getElementById("log").innerText = `Il te faut au moins ${card.cloneCost} clone actif pour cette technique !`;
+    return;
+  }
+
+  state.player.chakra -= effectiveCost;
+  if (effectiveCost === 0 && state.player.nextAttackFree && (card.type === "attaque" || card.type === "taijutsu")) {
+    state.player.nextAttackFree = false;
+  }
+
+  // Consommation des clones sacrifiés
+  if (card.cloneCost) {
+    state.player.clones -= card.cloneCost;
+    renderClones();
+    spawnVFX("smoke", "naruto-box");
+  }
+
+  // Déclenchement audio et VFX
+  if (card.isCurse) {
+    AudioEngine.play("block");
+    document.getElementById("log").innerText = `${card.name} a été retirée de ta main.`;
+  } else if (card.type === "kyubi") {
     AudioEngine.play("kyubi");
     triggerRush("naruto-box", true);
     spawnVFX("slash", "enemy-box");
@@ -485,12 +522,45 @@ function playCard(idx) {
     spawnVFX("slash", "enemy-box");
   }
 
+  // Dégâts subis (Kyûbi)
   if (card.selfDmg) {
     state.player.hp = Math.max(0, state.player.hp - card.selfDmg);
     triggerShake("naruto-box");
     spawnFloatingText("naruto-box", `-${card.selfDmg}`, "damage");
     if (activeRelic && activeRelic.onDamage) activeRelic.onDamage(state);
     if (checkPlayerDeath()) return;
+  }
+
+  // Mécanique 1 : Séquence (Ouverture)
+  if (card.opening && state.player.cardsPlayedThisTurn === 0) {
+    state.player.nextAttackFree = true;
+    document.getElementById("log").innerText = "Ouverture réussie ! Prochaine attaque gratuite !";
+    spawnFloatingText("naruto-box", "Combo !", "heal");
+  }
+
+  // Mécanique 1 : Séquence (Finisher)
+  let finisherBonusDmg = 0;
+  if (card.finisher && state.player.cardsPlayedThisTurn >= 2) {
+    finisherBonusDmg = 8;
+    state.player.shield += 5;
+    document.getElementById("log").innerText = "Finisher ! +8 dégâts et +5 Bouclier !";
+    spawnFloatingText("naruto-box", "Finisher !", "shield");
+  }
+
+  // Mécanique 3 : Canalisation Mudrâ
+  if (card.retain && card.channelBonus !== undefined) {
+    const chakraGain = 1 + card.channelBonus;
+    state.player.chakra = Math.min(state.player.maxChakra + 2, state.player.chakra + chakraGain);
+    document.getElementById("log").innerText = `Mudrâ libéré : +${chakraGain} Chakra !`;
+    card.channelBonus = 0;
+  }
+
+  if (card.drawBonus) {
+    drawCards(card.drawBonus);
+  }
+  if (card.clearMist) {
+    state.enemy.mist = false;
+    document.getElementById("log").innerText = "Le brouillard ennemi est dissipé !";
   }
 
   if (card.chakraGain) state.player.chakra += card.chakraGain;
@@ -506,7 +576,7 @@ function playCard(idx) {
   }
 
   let bonusDmg = (state.player.willOfFire && state.player.hp <= (state.player.maxHp / 2)) ? 4 : 0;
-  let dmg = card.dmg ? (card.dmg + bonusDmg) : 0;
+  let dmg = card.dmg ? (card.dmg + bonusDmg + finisherBonusDmg) : 0;
 
   if (card.fumaBonus && state.player.clones >= 2) {
     dmg = 22 + bonusDmg;
@@ -522,17 +592,29 @@ function playCard(idx) {
       document.getElementById("log").innerText = "Attaque ratée dans le brouillard !";
       spawnFloatingText("enemy-box", "RATÉ !", "miss");
     } else {
-      dealDamageToEnemy(dmg);
+      dealDamageToEnemy(dmg, !!card.piercing);
     }
   }
 
-  state.discard.push(state.hand.splice(idx, 1)[0]);
+  // Retrait de la main et gestion de l'Éphémère
+  const playedCard = state.hand.splice(idx, 1)[0];
+  if (playedCard.exhaust) {
+    state.exhausted.push(playedCard);
+    spawnFloatingText("naruto-box", "Consumée", "heal");
+  } else {
+    state.discard.push(playedCard);
+  }
+
+  state.player.cardsPlayedThisTurn++;
   updateUI();
   renderHand();
 
   if (state.enemy.hp <= 0) handleStageVictory();
 }
 
+// ==========================================
+// 7. FIN DU TOUR
+// ==========================================
 function endTurn() {
   if (isGameOver || busy || state.enemy.hp <= 0) return;
   busy = true;
@@ -544,7 +626,28 @@ function endTurn() {
     document.getElementById("log").innerText = `Les clones frappent pour ${cDmg} dégâts !`;
   }
 
-  while (state.hand.length > 0) state.discard.push(state.hand.pop());
+  // Dégâts passifs des fléaux non joués
+  state.hand.forEach(c => {
+    if (c.isCurse && c.endTurnDmg) {
+      hitPlayer(c.endTurnDmg);
+      spawnFloatingText("naruto-box", `-${c.endTurnDmg}`, "damage");
+    }
+  });
+
+  // Rétention des cartes Mudrâ
+  const retainedHand = [];
+  while (state.hand.length > 0) {
+    const c = state.hand.pop();
+    if (c.retain && !c.isCurse) {
+      if (c.channelBonus !== undefined) {
+        c.channelBonus = (c.channelBonus || 0) + 1;
+      }
+      retainedHand.push(c);
+    } else {
+      state.discard.push(c);
+    }
+  }
+  state.hand = retainedHand;
   renderHand();
 
   if (state.enemy.hp <= 0) {
@@ -584,6 +687,14 @@ function endTurn() {
       return;
     }
 
+    if (move.addCurse) {
+      for (let i = 0; i < move.addCurse.count; i++) {
+        state.discard.push({ ...CURSE_POOL[move.addCurse.key] });
+      }
+      document.getElementById("log").innerText = move.addCurse.message;
+      spawnFloatingText("naruto-box", "+Fléau", "miss");
+    }
+
     state.enemy.mist = !!move.mist;
     if (move.clearClones) {
       state.player.clones = 0;
@@ -595,7 +706,10 @@ function endTurn() {
 
     state.player.shield = 0;
     state.player.chakra = state.player.maxChakra;
+    state.player.cardsPlayedThisTurn = 0;
+    state.player.nextAttackFree = false;
     state.enemy.turnCount++;
+
     drawCards(4);
     updateUI();
     busy = false;
@@ -603,7 +717,7 @@ function endTurn() {
 }
 
 // ==========================================
-// 6. INTERFACE UTILISATEUR & CARTES EN MAIN
+// 8. INTERFACE & CARTES
 // ==========================================
 function renderHand() {
   const h = document.getElementById("hand");
@@ -613,20 +727,36 @@ function renderHand() {
 
   state.hand.forEach((card, i) => {
     const el = document.createElement("div");
-    el.className = `card card-${card.type}`;
+    el.className = `card card-${card.type} ${card.isCurse ? 'card-curse' : ''}`;
     el.onclick = () => playCard(i);
+
+    let displayCost = card.cost;
+    if ((card.type === "attaque" || card.type === "taijutsu") && state.player.nextAttackFree) {
+      displayCost = 0;
+    }
+
+    let extraBadge = "";
+    if (card.opening) extraBadge = `<span class="badge-tag">Ouverture</span>`;
+    if (card.finisher) extraBadge = `<span class="badge-tag">Finisher</span>`;
+    if (card.cloneCost) extraBadge = `<span class="badge-tag">Sacrifice (${card.cloneCost})</span>`;
+    if (card.retain) extraBadge = `<span class="badge-tag">Mudrâ (+${card.channelBonus || 0})</span>`;
+    if (card.exhaust) extraBadge = `<span class="badge-tag">Éphémère</span>`;
+    if (card.isCurse) extraBadge = `<span class="badge-tag badge-curse">Fléau</span>`;
 
     el.innerHTML = `
       <div class="card-top">
         <span class="card-title">${card.name}</span>
-        <span class="card-cost">${card.cost}</span>
+        <span class="card-cost" style="${displayCost === 0 && card.cost > 0 ? 'color:#3fb950;' : ''}">${displayCost}</span>
       </div>
       <div class="card-art">
         <img class="card-img-el" alt="${card.name}">
         <span class="card-art-placeholder" style="display:none;">${card.icon || "🎴"}</span>
       </div>
       <div class="card-desc">${card.desc}</div>
-      <div class="card-tag">${card.type}</div>
+      <div class="card-footer-info">
+        <span class="card-tag">${card.type}</span>
+        ${extraBadge}
+      </div>
     `;
 
     const imgEl = el.querySelector(".card-img-el");
@@ -646,7 +776,7 @@ function updateUI() {
   document.getElementById("chakra-display").innerText = `Chakra : ${state.player.chakra} / ${state.player.maxChakra}`;
 
   const stage = STAGES[currentStageIndex];
-  const nextMove = stage.pattern[(state.enemy.turnCount - 1) % stage.pattern.length];
+  const nextMove = stage.pattern[state.enemy.turnCount % stage.pattern.length];
   const intentEl = document.getElementById("enemy-intent");
   if (intentEl) intentEl.innerText = `Prépare : ${nextMove.intent}`;
 
@@ -661,7 +791,7 @@ function updateCounters() {
 }
 
 // ==========================================
-// 7. INSPECTEUR DE PIOCHE ET DÉFAUSSE
+// 9. INSPECTEUR DE PIOCHES
 // ==========================================
 function openInspector(pileType) {
   const modal = document.getElementById("inspector-modal");
@@ -676,13 +806,13 @@ function openInspector(pileType) {
   grid.innerHTML = "";
 
   if (cardsList.length === 0) {
-    grid.innerHTML = `<p style="color: #8b949e; margin: 40px 0; font-size: 15px;">Cette pile est actuellement vide.</p>`;
+    grid.innerHTML = `<p style="color: #8b949e; margin: 40px 0; font-size: 14px;">Cette pile est actuellement vide.</p>`;
   } else {
     const sortedCards = [...cardsList].sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name));
 
     sortedCards.forEach(card => {
       const el = document.createElement("div");
-      el.className = `card card-${card.type}`;
+      el.className = `card card-${card.type} ${card.isCurse ? 'card-curse' : ''}`;
       el.innerHTML = `
         <div class="card-top">
           <span class="card-title">${card.name}</span>
@@ -714,17 +844,10 @@ function closeInspector(event) {
 }
 
 // ==========================================
-// 8. FEU DE CAMP & AMÉLIORATION DE CARTES
+// 10. REPOS & AMÉLIORATION
 // ==========================================
 function openRestSite() {
   updateNodeMap(3);
-  // Ramène main + défausse dans le deck (sinon le choix d'amélioration et la sauvegarde sont incomplets)
-  state.deck.push(...state.hand, ...state.discard);
-  state.hand = [];
-  state.discard = [];
-  atRest = true;
-  updateCounters();
-  renderHand();
   saveGame();
 
   const restScreen = document.getElementById("rest-screen");
@@ -818,7 +941,7 @@ function upgradeCard(cardRef) {
 }
 
 // ==========================================
-// 9. VICTOIRES & RÉCOMPENSES
+// 11. VICTOIRES & RÉCOMPENSES
 // ==========================================
 function handleStageVictory() {
   const overlay = document.getElementById("overlay");
@@ -830,15 +953,15 @@ function handleStageVictory() {
     clearSave();
     document.getElementById("overlay-title").innerText = "VICTOIRE TOTALE SUR LE PAYS DES VAGUES !";
     document.getElementById("overlay-title").style.color = "#f59e0b";
-    document.getElementById("overlay-sub").innerText = "Le grand pont Naruto est achevé. Zabuza a été vaincu !";
-    picker.innerHTML = `<button id="end-turn-btn" style="padding:14px 30px; font-size:16px;" onclick="location.reload()">Retourner au Menu</button>`;
+    document.getElementById("overlay-sub").innerText = "Le pont Naruto est achevé. Zabuza a été vaincu !";
+    picker.innerHTML = `<button id="end-turn-btn" style="padding:12px 28px; font-size:15px;" onclick="location.reload()">Retourner au Menu</button>`;
     return;
   }
 
   if (currentStageIndex === 2) {
     document.getElementById("overlay-title").innerText = "VICTOIRE ÉLITE SUR HAKU !";
     document.getElementById("overlay-title").style.color = "#f59e0b";
-    document.getElementById("overlay-sub").innerText = "Choisis un trésor ninja légendaire (Relique passive) :";
+    document.getElementById("overlay-sub").innerText = "Choisis une relique passive :";
 
     RELICS_POOL.forEach(relic => {
       const el = document.createElement("div");
@@ -864,9 +987,11 @@ function handleStageVictory() {
 
   document.getElementById("overlay-title").innerText = `Victoire sur ${STAGES[currentStageIndex].name} !`;
   document.getElementById("overlay-title").style.color = "#f59e0b";
-  document.getElementById("overlay-sub").innerText = "Choisis une technique pour renforcer ton deck :";
+  document.getElementById("overlay-sub").innerText = "Choisis une technique pour ton deck :";
 
-  REWARD_OPTIONS.forEach(reward => {
+  const randomOptions = [...REWARD_OPTIONS].sort(() => 0.5 - Math.random()).slice(0, 3);
+
+  randomOptions.forEach(reward => {
     const el = document.createElement("div");
     el.className = `card card-${reward.type}`;
     el.style.transform = "scale(1.05)";
@@ -893,7 +1018,7 @@ function handleStageVictory() {
 }
 
 // ==========================================
-// 10. SAUVEGARDE LOCALE & MENU PRINCIPAL
+// 12. SAUVEGARDE & MENU PRINCIPAL
 // ==========================================
 const SAVE_KEY = "naruto_deckbuilder_save";
 
@@ -905,7 +1030,6 @@ function saveGame() {
     playerHp: state.player.hp,
     playerMaxHp: state.player.maxHp,
     playerWillOfFire: state.player.willOfFire,
-    atRest,
     deck: state.deck
   };
   localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
@@ -938,14 +1062,6 @@ function continueGame() {
   }
 
   document.getElementById("main-menu").style.display = "none";
-  if (data.atRest) {
-    currentStageIndex = data.currentStageIndex;
-    state.hand = [];
-    state.discard = [];
-    updateUI();
-    openRestSite();
-    return;
-  }
   loadStage(data.currentStageIndex);
 }
 
@@ -974,6 +1090,7 @@ function initNewGame() {
   ];
   state.hand = [];
   state.discard = [];
+  state.exhausted = [];
 
   const narutoImg = document.getElementById("naruto-img");
   if (narutoImg) resolveImgSrc(narutoImg, "naruto.png");
@@ -982,7 +1099,7 @@ function initNewGame() {
 }
 
 // ==========================================
-// 11. OPTIONS & PARAMÈTRES
+// 13. PARAMÈTRES / OPTIONS
 // ==========================================
 function openSettingsModal() {
   document.getElementById("settings-modal").style.display = "flex";
@@ -1023,15 +1140,12 @@ function updateDisplaySettings() {
 }
 
 // ==========================================
-// 12. DÉMARRAGE AU CHARGEMENT DE LA PAGE
+// 14. CHARGEMENT INITIAL DE LA PAGE
 // ==========================================
 window.onload = () => {
   preloadAllAssets();
-  
-  // Prépare le morceau du menu
   AudioEngine.playMusic("main_menu.m4a");
-  
-  // Si le navigateur bloque l'autoplay, le premier clic n'importe où lance la musique
+
   document.addEventListener("click", () => {
     AudioEngine.init();
     if (AudioEngine.musicAudio && AudioEngine.musicAudio.paused) {
