@@ -795,3 +795,6 @@ footer {
   margin-top: 20px;
 }
 #rest-choices .menu-btn { width: 180px; }
+/* Asset preparation feedback */
+#asset-loading-status { font-size: 13px; color: #c9d1d9; margin: 0 0 12px; }
+.menu-btn:disabled { opacity: 0.55; cursor: wait; transform: none; }

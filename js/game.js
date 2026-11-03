@@ -1,62 +1,86 @@
 // ==========================================
-// 1. GESTION DU CACHE & CHARGEUR D'IMAGES
+// 1. CHARGEMENT ET PRÉPARATION DES IMAGES
 // ==========================================
-const resolvedPathCache = {};
+// Keep the Image objects alive and share loading/decoding across all callers.
+const imageAssets = new Map();
+let assetsReady = false;
+let assetsPromise;
+
+function imagePath(originalPath) {
+  if (!originalPath) return null;
+  const filename = originalPath.split('/').pop();
+  // These curse cards deliberately use their emoji until artwork is available.
+  if (filename === "card_miroir.png") return null;
+  if (filename.startsWith("card_")) {
+    return `assets/cards/${filename.replace(/\.png$/, ".webp")}`;
+  }
+  return originalPath.includes('/') ? originalPath : `assets/characters/${filename}`;
+}
+
+function loadImageAsset(path) {
+  if (imageAssets.has(path)) return imageAssets.get(path).ready;
+  const img = new Image();
+  const entry = { img, ready: null };
+  entry.ready = new Promise(resolve => {
+    let finished = false;
+    const finish = ok => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      img.onload = img.onerror = null;
+      resolve(ok ? img : null);
+    };
+    // A failed or stalled asset must never trap the user at the menu.
+    const timer = setTimeout(() => finish(false), 15000);
+    img.onerror = () => finish(false);
+    img.onload = async () => {
+      try { if (img.decode) await img.decode(); } catch (_) { /* loaded fallback */ }
+      finish(true);
+    };
+    img.src = path;
+  });
+  imageAssets.set(path, entry);
+  return entry.ready;
+}
 
 function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
-  if (!originalPath) return;
-  const filename = originalPath.split('/').pop();
-
-  if (resolvedPathCache[filename]) {
-    imgElement.src = resolvedPathCache[filename];
-    return;
-  }
-
-  const candidatePaths = [
-    originalPath,
-    `assets/characters/${filename}`,
-    `assets/cards/${filename}`,
-    `assets/${filename}`,
-    filename
-  ];
-  const uniquePaths = [...new Set(candidatePaths)];
-  let idx = 0;
-
-  imgElement.src = uniquePaths[0];
-
-  imgElement.onload = function () {
-    resolvedPathCache[filename] = imgElement.src;
-  };
-
-  imgElement.onerror = function () {
-    idx++;
-    if (idx < uniquePaths.length) {
-      imgElement.src = uniquePaths[idx];
-    } else {
-      imgElement.onerror = null;
-      if (fallbackEmoji) {
-        imgElement.style.display = "none";
-        const placeholder = imgElement.nextElementSibling;
-        if (placeholder && placeholder.classList.contains("card-art-placeholder")) {
-          placeholder.style.display = "block";
-        }
-      }
+  const path = imagePath(originalPath);
+  const placeholder = imgElement.nextElementSibling;
+  const showPlaceholder = () => {
+    imgElement.style.display = "none";
+    if (placeholder && placeholder.classList.contains("card-art-placeholder")) {
+      placeholder.textContent = fallbackEmoji || "🎴";
+      placeholder.style.display = "block";
     }
   };
+  showPlaceholder();
+  imgElement.dataset.assetPath = path || "";
+  if (!path) return;
+  loadImageAsset(path).then(img => {
+    // Ignore stale loads if an enemy image changed in the meantime.
+    if (!img || imgElement.dataset.assetPath !== path) return;
+    imgElement.src = img.src;
+    imgElement.style.display = "";
+    if (placeholder && placeholder.classList.contains("card-art-placeholder")) {
+      placeholder.style.display = "none";
+    }
+  });
 }
 
 function preloadAllAssets() {
-  const imagesToPreload = [
-    "naruto.png", "brigand.png", "freres_demons.png", "haku.png", "zabuza.png",
-    "card_poing.png", "card_kawarimi.png", "card_clones.png", "card_rendan.png",
-    "card_kyubi.png", "card_fuma.png", "card_volonte.png", "card_2000poings.png",
-    "card_assaut.png", "card_chakra_rouge.png", "card_miroir.png"
-  ];
-
-  imagesToPreload.forEach(name => {
-    const dummyImg = new Image();
-    resolveImgSrc(dummyImg, name);
+  if (assetsPromise) return assetsPromise;
+  const names = ["naruto.png", "brigand.png", "freres_demons.png", "haku.png", "zabuza.png",
+    ...CARDS_POOL.map(card => card.img)];
+  const paths = [...new Set(names.map(imagePath).filter(Boolean))];
+  assetsPromise = Promise.all(paths.map(loadImageAsset)).then(results => {
+    assetsReady = true;
+    document.querySelectorAll("[data-requires-assets]").forEach(btn => { btn.disabled = false; });
+    const status = document.getElementById("asset-loading-status");
+    if (status) status.textContent = results.some(img => !img)
+      ? "Certaines images sont indisponibles. Tu peux quand même jouer." : "";
+    return results;
   });
+  return assetsPromise;
 }
 
 // ==========================================
@@ -1185,6 +1209,8 @@ function hasSavedGame() {
 }
 
 function continueGame() {
+  if (!assetsReady) return;
+  resolveImgSrc(document.getElementById("naruto-img"), "naruto.png");
   AudioEngine.init();
   const raw = localStorage.getItem(SAVE_KEY);
   if (!raw) return;
@@ -1207,6 +1233,7 @@ function continueGame() {
 }
 
 function startNewGamePrompt() {
+  if (!assetsReady) return;
   AudioEngine.init();
   clearSave();
   document.getElementById("main-menu").style.display = "none";
