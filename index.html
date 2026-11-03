@@ -8,6 +8,9 @@
 </head>
 <body class="bg-port">
 
+  <!-- Brume Dense (Zabuza Phase 2) -->
+  <div id="dense-mist-overlay"></div>
+
   <!-- BARRE SUPÉRIEURE : Progression, Reliques, Piles & Paramètres -->
   <div id="top-bar">
     <div id="node-map">
@@ -82,6 +85,15 @@
 
     <!-- Box Ennemi -->
     <div class="fighter-box" id="enemy-box">
+      <!-- Jauge de Canalisation / Rupture (Boss Break Gauge) -->
+      <div id="boss-channel-box">
+        <span class="channel-title">Canalisation en cours !</span>
+        <div class="channel-bar-bg">
+          <div id="channel-bar-fill" class="channel-bar-fill"></div>
+        </div>
+        <span id="channel-txt" class="channel-txt">Dégâts requis : 0 / 18</span>
+      </div>
+
       <div class="intent-badge" id="enemy-intent">Prépare une attaque</div>
       <div class="sprite-container">
         <img id="enemy-img" class="fighter-sprite" alt="Ennemi">
@@ -105,7 +117,7 @@
   </footer>
 
   <!-- REPOS CHEZ TAZUNA -->
-  <div id="rest-screen">
+  <div id="rest-screen" style="display: none;">
     <div class="rest-box">
       <h2>Maison de Tazuna (Feu de Camp)</h2>
       <p>Repose-toi et prépare-toi pour l'affrontement décisif sur le pont.</p>
@@ -118,7 +130,7 @@
   </div>
 
   <!-- OVERLAY VICTOIRE / RÉCOMPENSES / DÉFAITE -->
-  <div id="overlay">
+  <div id="overlay" style="display: none;">
     <div class="modal-box">
       <h2 id="overlay-title">Victoire !</h2>
       <p id="overlay-sub">Choisis une récompense :</p>

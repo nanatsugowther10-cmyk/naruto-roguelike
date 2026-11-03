@@ -143,6 +143,26 @@ const AudioEngine = {
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
       osc.connect(gain); gain.connect(ctx.destination);
       osc.start(now); osc.stop(now + 0.35);
+    } else if (type === "water_dragon") {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(160, now);
+      osc.frequency.exponentialRampToValueAtTime(40, now + 0.55);
+      gain.gain.setValueAtTime(0.6 * sfxVol, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 0.55);
+    } else if (type === "break") {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(1200, now + 0.25);
+      gain.gain.setValueAtTime(0.5 * sfxVol, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 0.25);
     }
   },
 
@@ -213,7 +233,19 @@ const state = {
     cardsPlayedThisTurn: 0,
     nextAttackFree: false
   },
-  enemy: { hp: 38, maxHp: 38, shield: 0, mist: false, turnCount: 1 },
+  enemy: {
+    hp: 38,
+    maxHp: 38,
+    shield: 0,
+    mist: false,
+    denseMist: false,
+    turnCount: 1,
+    inPhase2: false,
+    isChanneling: false,
+    channelDmgRequired: 0,
+    channelDmgTaken: 0,
+    channelSpellDmg: 0
+  },
   deck: [],
   hand: [],
   discard: [],
@@ -277,6 +309,12 @@ function spawnVFX(type, targetBoxId = "enemy-box") {
     el.innerText = "⚔️";
     combatZone.appendChild(el);
     setTimeout(() => el.remove(), 310);
+  } else if (type === "water_dragon" && combatZone) {
+    const el = document.createElement("div");
+    el.className = "vfx-dragon";
+    el.innerText = "🐉🌊";
+    combatZone.appendChild(el);
+    setTimeout(() => el.remove(), 650);
   }
 }
 
@@ -356,7 +394,7 @@ function loadStage(index) {
     AudioEngine.playMusic("second_level.m4a");
   }
 
-  // Remettre toutes les cartes en deck (sauf les fléaux temporaires)
+  // Remettre toutes les cartes en deck
   state.deck.push(...state.hand, ...state.discard, ...state.exhausted);
   state.hand = [];
   state.discard = [];
@@ -364,12 +402,25 @@ function loadStage(index) {
   state.deck = state.deck.filter(c => !c.isCurse);
   shuffle(state.deck);
 
-  // Réinitialisation stricte de l'ennemi
+  // Réinitialisation de l'ennemi
   state.enemy.hp = stage.maxHp;
   state.enemy.maxHp = stage.maxHp;
   state.enemy.shield = 0;
   state.enemy.mist = false;
+  state.enemy.denseMist = false;
   state.enemy.turnCount = 1;
+  state.enemy.inPhase2 = false;
+  state.enemy.isChanneling = false;
+  state.enemy.channelDmgRequired = 0;
+  state.enemy.channelDmgTaken = 0;
+  state.enemy.channelSpellDmg = 0;
+
+  const mistOverlay = document.getElementById("dense-mist-overlay");
+  if (mistOverlay) mistOverlay.classList.remove("active");
+  const enemyBox = document.getElementById("enemy-box");
+  if (enemyBox) enemyBox.classList.remove("demon-aura");
+  const channelBox = document.getElementById("boss-channel-box");
+  if (channelBox) channelBox.style.display = "none";
 
   // Réinitialisation du joueur
   state.player.shield = 0;
@@ -394,6 +445,25 @@ function loadStage(index) {
   if (logEl) logEl.innerText = `Combat : ${stage.name} !`;
 }
 
+function checkBossPhaseTransition() {
+  const stage = STAGES[currentStageIndex];
+  if (!stage.hasPhase2 || state.enemy.inPhase2) return;
+
+  if (state.enemy.hp <= (state.enemy.maxHp / 2) && state.enemy.hp > 0) {
+    state.enemy.inPhase2 = true;
+    
+    const enemyBox = document.getElementById("enemy-box");
+    if (enemyBox) enemyBox.classList.add("demon-aura");
+
+    const mistOverlay = document.getElementById("dense-mist-overlay");
+    if (mistOverlay) mistOverlay.classList.add("active");
+
+    AudioEngine.play("kyubi");
+    document.getElementById("log").innerText = "⚠️ ZABUZA ENRAGÉ : L'aura du Démon du Brouillard s'éveille !";
+    spawnFloatingText("enemy-box", "PHASE 2 !", "damage");
+  }
+}
+
 function dealDamageToEnemy(amt, piercing = false) {
   triggerShake("enemy-box");
   let directHpDmg = amt;
@@ -414,6 +484,42 @@ function dealDamageToEnemy(amt, piercing = false) {
   if (directHpDmg > 0) {
     state.enemy.hp = Math.max(0, state.enemy.hp - directHpDmg);
     spawnFloatingText("enemy-box", `-${directHpDmg}`, "damage");
+  }
+
+  // Rupture de canalisation
+  if (state.enemy.isChanneling && amt > 0) {
+    state.enemy.channelDmgTaken += amt;
+    updateChannelUI();
+
+    if (state.enemy.channelDmgTaken >= state.enemy.channelDmgRequired) {
+      state.enemy.isChanneling = false;
+      AudioEngine.play("break");
+      spawnFloatingText("enemy-box", "RUPTURE !", "heal");
+      document.getElementById("log").innerText = "💥 CANALISATION ROMPUE ! Le Dragon Aqueux s'effondre !";
+      
+      const channelBox = document.getElementById("boss-channel-box");
+      if (channelBox) channelBox.style.display = "none";
+    }
+  }
+
+  checkBossPhaseTransition();
+}
+
+function updateChannelUI() {
+  const channelBox = document.getElementById("boss-channel-box");
+  if (!channelBox) return;
+
+  if (state.enemy.isChanneling) {
+    channelBox.style.display = "flex";
+    const fill = document.getElementById("channel-bar-fill");
+    const txt = document.getElementById("channel-txt");
+
+    const pct = Math.min(100, (state.enemy.channelDmgTaken / state.enemy.channelDmgRequired) * 100);
+
+    if (fill) fill.style.width = `${pct}%`;
+    if (txt) txt.innerText = `Dégâts requis : ${state.enemy.channelDmgTaken} / ${state.enemy.channelDmgRequired}`;
+  } else {
+    channelBox.style.display = "none";
   }
 }
 
@@ -469,7 +575,6 @@ function playCard(idx) {
   const card = state.hand[idx];
   if (!card) return;
 
-  // Calcul du coût avec bonus Ouverture
   let effectiveCost = card.cost;
   if ((card.type === "attaque" || card.type === "taijutsu") && state.player.nextAttackFree) {
     effectiveCost = 0;
@@ -480,7 +585,6 @@ function playCard(idx) {
     return;
   }
 
-  // Vérification de sacrifice de clone
   if (card.cloneCost && state.player.clones < card.cloneCost) {
     document.getElementById("log").innerText = `Il te faut au moins ${card.cloneCost} clone actif pour cette technique !`;
     return;
@@ -491,14 +595,12 @@ function playCard(idx) {
     state.player.nextAttackFree = false;
   }
 
-  // Consommation des clones sacrifiés
   if (card.cloneCost) {
     state.player.clones -= card.cloneCost;
     renderClones();
     spawnVFX("smoke", "naruto-box");
   }
 
-  // Déclenchement audio et VFX
   if (card.isCurse) {
     AudioEngine.play("block");
     document.getElementById("log").innerText = `${card.name} a été retirée de ta main.`;
@@ -522,7 +624,6 @@ function playCard(idx) {
     spawnVFX("slash", "enemy-box");
   }
 
-  // Dégâts subis (Kyûbi)
   if (card.selfDmg) {
     state.player.hp = Math.max(0, state.player.hp - card.selfDmg);
     triggerShake("naruto-box");
@@ -531,14 +632,12 @@ function playCard(idx) {
     if (checkPlayerDeath()) return;
   }
 
-  // Mécanique 1 : Séquence (Ouverture)
   if (card.opening && state.player.cardsPlayedThisTurn === 0) {
     state.player.nextAttackFree = true;
     document.getElementById("log").innerText = "Ouverture réussie ! Prochaine attaque gratuite !";
     spawnFloatingText("naruto-box", "Combo !", "heal");
   }
 
-  // Mécanique 1 : Séquence (Finisher)
   let finisherBonusDmg = 0;
   if (card.finisher && state.player.cardsPlayedThisTurn >= 2) {
     finisherBonusDmg = 8;
@@ -547,7 +646,6 @@ function playCard(idx) {
     spawnFloatingText("naruto-box", "Finisher !", "shield");
   }
 
-  // Mécanique 3 : Canalisation Mudrâ
   if (card.retain && card.channelBonus !== undefined) {
     const chakraGain = 1 + card.channelBonus;
     state.player.chakra = Math.min(state.player.maxChakra + 2, state.player.chakra + chakraGain);
@@ -560,7 +658,10 @@ function playCard(idx) {
   }
   if (card.clearMist) {
     state.enemy.mist = false;
-    document.getElementById("log").innerText = "Le brouillard ennemi est dissipé !";
+    state.enemy.denseMist = false;
+    const mistOverlay = document.getElementById("dense-mist-overlay");
+    if (mistOverlay) mistOverlay.classList.remove("active");
+    document.getElementById("log").innerText = "Le brouillard ennemi est totalement dissipé !";
   }
 
   if (card.chakraGain) state.player.chakra += card.chakraGain;
@@ -587,16 +688,23 @@ function playCard(idx) {
     dmg += (state.player.clones * 4);
   }
 
+  // Précision en fonction de la brume
   if (dmg > 0) {
-    if (state.enemy.mist && state.player.clones < 2 && Math.random() < 0.5) {
-      document.getElementById("log").innerText = "Attaque ratée dans le brouillard !";
+    let missChance = 0;
+    if (state.enemy.denseMist) {
+      missChance = state.player.clones >= 2 ? 0.15 : 0.60;
+    } else if (state.enemy.mist) {
+      missChance = state.player.clones >= 2 ? 0 : 0.50;
+    }
+
+    if (missChance > 0 && Math.random() < missChance) {
+      document.getElementById("log").innerText = "Attaque perdue dans l'épaisse brume de Zabuza !";
       spawnFloatingText("enemy-box", "RATÉ !", "miss");
     } else {
       dealDamageToEnemy(dmg, !!card.piercing);
     }
   }
 
-  // Retrait de la main et gestion de l'Éphémère
   const playedCard = state.hand.splice(idx, 1)[0];
   if (playedCard.exhaust) {
     state.exhausted.push(playedCard);
@@ -613,7 +721,7 @@ function playCard(idx) {
 }
 
 // ==========================================
-// 7. FIN DU TOUR
+// 7. FIN DU TOUR (AVEC BOSS PHASE 2 & SUIRYŪDAN)
 // ==========================================
 function endTurn() {
   if (isGameOver || busy || state.enemy.hp <= 0) return;
@@ -626,7 +734,6 @@ function endTurn() {
     document.getElementById("log").innerText = `Les clones frappent pour ${cDmg} dégâts !`;
   }
 
-  // Dégâts passifs des fléaux non joués
   state.hand.forEach(c => {
     if (c.isCurse && c.endTurnDmg) {
       hitPlayer(c.endTurnDmg);
@@ -634,7 +741,6 @@ function endTurn() {
     }
   });
 
-  // Rétention des cartes Mudrâ
   const retainedHand = [];
   while (state.hand.length > 0) {
     const c = state.hand.pop();
@@ -658,11 +764,37 @@ function endTurn() {
   }
 
   const stage = STAGES[currentStageIndex];
-  const move = stage.pattern[(state.enemy.turnCount - 1) % stage.pattern.length];
+  const activePattern = (stage.hasPhase2 && state.enemy.inPhase2) ? stage.phase2Pattern : stage.pattern;
+  const move = activePattern[(state.enemy.turnCount - 1) % activePattern.length];
+
+  // Résolution de la canalisation si non rompue
+  if (state.enemy.isChanneling) {
+    state.enemy.isChanneling = false;
+    const channelBox = document.getElementById("boss-channel-box");
+    if (channelBox) channelBox.style.display = "none";
+
+    spawnVFX("water_dragon");
+    AudioEngine.play("water_dragon");
+    document.getElementById("log").innerText = "🌊 SUIRYŪDAN NO JUTSU ! Le Dragon Aqueux percute violemment Naruto !";
+    
+    setTimeout(() => {
+      hitPlayer(state.enemy.channelSpellDmg || 28);
+    }, 350);
+  }
 
   if (move.shield) {
     state.enemy.shield += move.shield;
     AudioEngine.play("block");
+  }
+
+  // Démarrage de canalisation pour le prochain tour
+  if (move.channeling) {
+    state.enemy.isChanneling = true;
+    state.enemy.channelDmgRequired = move.breakThreshold;
+    state.enemy.channelDmgTaken = 0;
+    state.enemy.channelSpellDmg = move.channelDmg;
+    updateChannelUI();
+    document.getElementById("log").innerText = move.message;
   }
 
   const hits = move.multiHit ? Array(move.multiHit).fill(move.hitDmg) : (move.dmg ? [move.dmg] : []);
@@ -696,6 +828,14 @@ function endTurn() {
     }
 
     state.enemy.mist = !!move.mist;
+    state.enemy.denseMist = !!move.denseMist;
+
+    const mistOverlay = document.getElementById("dense-mist-overlay");
+    if (mistOverlay) {
+      if (state.enemy.denseMist) mistOverlay.classList.add("active");
+      else mistOverlay.classList.remove("active");
+    }
+
     if (move.clearClones) {
       state.player.clones = 0;
       renderClones();
@@ -713,7 +853,7 @@ function endTurn() {
     drawCards(4);
     updateUI();
     busy = false;
-  }, Math.max(totalAnimTime, 100));
+  }, Math.max(totalAnimTime, 120));
 }
 
 // ==========================================
@@ -776,7 +916,8 @@ function updateUI() {
   document.getElementById("chakra-display").innerText = `Chakra : ${state.player.chakra} / ${state.player.maxChakra}`;
 
   const stage = STAGES[currentStageIndex];
-  const nextMove = stage.pattern[state.enemy.turnCount % stage.pattern.length];
+  const activePattern = (stage.hasPhase2 && state.enemy.inPhase2) ? stage.phase2Pattern : stage.pattern;
+  const nextMove = activePattern[state.enemy.turnCount % activePattern.length];
   const intentEl = document.getElementById("enemy-intent");
   if (intentEl) intentEl.innerText = `Prépare : ${nextMove.intent}`;
 

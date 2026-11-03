@@ -1,5 +1,5 @@
 // ==========================================
-// 1. CARTE DE BASE & NOUVELLES TECHNIQUES
+// 1. CARTES DE BASE & NOUVELLES TECHNIQUES
 // ==========================================
 const CARDS_POOL = [
   // --- Cartes de départ ---
@@ -273,7 +273,7 @@ const RELICS_POOL = [
 ];
 
 // ==========================================
-// 4. ÉTAPES & BOSS PATTERNS
+// 4. ÉTAPES & BOSS PATTERNS (PHASE 1 & PHASE 2)
 // ==========================================
 const STAGES = [
   {
@@ -316,13 +316,27 @@ const STAGES = [
     name: "Zabuza Momochi",
     title: "Étape Finale : Combat sur le Grand Pont",
     sprite: "zabuza.png",
-    maxHp: 75,
+    maxHp: 80,
+    hasPhase2: true,
     bgClass: "bg-pont",
     pattern: [
       { intent: "Camouflage dans la Brume + Peur", mist: true, addCurse: { key: "peur", count: 1, message: "Zabuza projette une aura meurtrière dans ton deck !" } },
-      { intent: "Décapitation au Kubikiribôchô (18 dmg)", dmg: 18 },
+      { intent: "Décapitation au Kubikiribôchô (14 dmg)", dmg: 14 },
       { intent: "Grande Cataracte (Balaye tous les clones)", clearClones: true, dmg: 8 },
-      { intent: "Garde de Fer (15 shield)", shield: 15 }
+      { intent: "Garde de Fer (12 shield)", shield: 12 }
+    ],
+    phase2Pattern: [
+      { 
+        intent: "Canalisation : Dragon Aqueux (Suiryūdan) !", 
+        channeling: true, 
+        breakThreshold: 18, 
+        channelDmg: 28, 
+        denseMist: true,
+        message: "Zabuza malaxe une énorme quantité de chakra aqueux ! Brise sa canalisation en lui infligeant 18 dégâts !" 
+      },
+      { intent: "Frénésie du Démon (6x3 dmg)", multiHit: 3, hitDmg: 6 },
+      { intent: "Brume Meurtrière Absolue + 2 Fléaux", denseMist: true, addCurse: { key: "peur", count: 2, message: "La soif de sang de Zabuza t'étouffe !" } },
+      { intent: "Tranchage Brutal (16 dmg) + Garde (10)", dmg: 16, shield: 10 }
     ]
   }
 ];

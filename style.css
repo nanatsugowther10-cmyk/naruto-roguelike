@@ -19,9 +19,10 @@ body {
   flex-direction: column;
   overflow-x: hidden;
   user-select: none;
+  position: relative;
 }
 
-/* Fonds thématiques */
+/* Fonds thématiques des étapes */
 .bg-port {
   background: radial-gradient(circle at 50% 30%, #172635 0%, #070d14 100%);
 }
@@ -32,7 +33,27 @@ body {
   background: radial-gradient(circle at 50% 30%, #202636 0%, #0a0d14 100%);
 }
 
-/* BARRE SUPÉRIEURE */
+/* Brume Dense de Zabuza Phase 2 */
+#dense-mist-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, rgba(148, 163, 184, 0.45) 0%, rgba(15, 23, 42, 0.8) 100%);
+  backdrop-filter: blur(4px);
+  z-index: 45;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+#dense-mist-overlay.active {
+  opacity: 1;
+  animation: mist-pulse 4s ease-in-out infinite alternate;
+}
+@keyframes mist-pulse {
+  0% { opacity: 0.65; }
+  100% { opacity: 0.95; }
+}
+
+/* BARRE SUPÉRIEURE : Progression, Reliques, Piles & Paramètres */
 #top-bar {
   width: 100%;
   height: 60px;
@@ -40,7 +61,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(13, 17, 23, 0.88);
+  background: rgba(13, 17, 23, 0.9);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(8px);
@@ -199,6 +220,17 @@ header {
   align-items: center;
   position: relative;
   width: 260px;
+  transition: filter 0.4s ease;
+}
+
+/* Aura Démoniaque de Zabuza Phase 2 */
+.demon-aura .fighter-sprite {
+  filter: drop-shadow(0 0 16px rgba(220, 38, 38, 0.8)) drop-shadow(0 0 35px rgba(239, 68, 68, 0.5)) !important;
+  animation: demon-glow 1.5s ease-in-out infinite alternate;
+}
+@keyframes demon-glow {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.03); filter: drop-shadow(0 0 24px rgba(239, 68, 68, 0.95)) drop-shadow(0 0 50px rgba(185, 28, 28, 0.7)); }
 }
 
 .sprite-container {
@@ -232,6 +264,57 @@ header {
   object-fit: contain;
   opacity: 0.8;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+/* Jauge de Canalisation / Rupture (Boss Break Gauge) */
+#boss-channel-box {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  width: 180px;
+  margin-bottom: 6px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid #38bdf8;
+  border-radius: 8px;
+  padding: 4px 8px;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+  animation: channel-pulse 1s infinite alternate;
+}
+@keyframes channel-pulse {
+  0% { border-color: #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.3); }
+  100% { border-color: #ef4444; box-shadow: 0 0 18px rgba(239, 68, 68, 0.6); }
+}
+
+.channel-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: #38bdf8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+
+.channel-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: #1e293b;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #475569;
+}
+
+.channel-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #38bdf8, #ef4444);
+  transition: width 0.2s ease;
+}
+
+.channel-txt {
+  font-size: 9.5px;
+  color: #cbd5e1;
+  font-weight: 700;
+  margin-top: 2px;
 }
 
 .intent-badge {
@@ -437,7 +520,7 @@ footer {
   border-radius: 3px;
 }
 
-/* Couleurs spécifiques de bordure de carte */
+/* Couleurs spécifiques de cartes */
 .card-attaque { border-color: #da3633; }
 .card-taijutsu { border-color: #d97706; }
 .card-defense { border-color: #2563eb; }
@@ -552,6 +635,24 @@ footer {
   100% { left: calc(100% - 320px); transform: rotate(720deg) scale(1.2); opacity: 0; }
 }
 
+/* VFX : DRAGON AQUEUX (SUIRYŪDAN) */
+.vfx-dragon {
+  position: absolute;
+  top: 20%;
+  right: 180px;
+  font-size: 80px;
+  pointer-events: none;
+  z-index: 58;
+  filter: drop-shadow(0 0 20px #0284c7) drop-shadow(0 0 40px #38bdf8);
+  animation: vfx-dragon-dash 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes vfx-dragon-dash {
+  0% { transform: translateX(0) scale(0.6) rotate(15deg); opacity: 0; }
+  25% { opacity: 1; transform: translateX(-80px) scale(1.4) rotate(0deg); }
+  75% { opacity: 1; transform: translateX(-380px) scale(1.6) rotate(-10deg); }
+  100% { transform: translateX(-480px) scale(2) rotate(-20deg); opacity: 0; }
+}
+
 /* MODALES & ÉCRANS */
 #main-menu, #settings-modal, #inspector-modal, #rest-screen, #overlay {
   position: fixed;
@@ -563,26 +664,24 @@ footer {
   z-index: 100;
 }
 
-/* Seul le menu principal doit être affiché au démarrage */
-#main-menu { 
-  display: flex; 
-  z-index: 200; 
-  background: radial-gradient(circle at center, #1b2838 0%, #0a0e14 100%); 
+#main-menu {
+  display: flex;
+  z-index: 200;
+  background: radial-gradient(circle at center, #1b2838 0%, #0a0e14 100%);
 }
 
-/* Toutes les autres modales doivent être masquées par défaut */
-#settings-modal { 
-  display: none; 
-  z-index: 210; 
+#settings-modal {
+  display: none;
+  z-index: 210;
 }
 
-#inspector-modal { 
-  display: none; 
-  z-index: 150; 
+#inspector-modal {
+  display: none;
+  z-index: 150;
 }
 
-#rest-screen, #overlay { 
-  display: none; 
+#rest-screen, #overlay {
+  display: none;
 }
 
 .menu-content {
