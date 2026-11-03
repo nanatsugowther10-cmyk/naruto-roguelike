@@ -189,6 +189,8 @@
     </div>
   </div>
 
+  <section id="mizuki-tutorial" aria-label="Tutoriel contre Mizuki" hidden></section>
+
   <!-- MENU PRINCIPAL -->
   <div id="main-menu">
     <div class="menu-content">
@@ -197,7 +199,8 @@
       <p id="asset-loading-status" role="status" aria-live="polite">Préparation des images…</p>
       <div class="menu-buttons">
         <button data-requires-assets disabled id="btn-continue" class="menu-btn" onclick="continueGame()" style="display: none;">Continuer la mission</button>
-        <button class="menu-btn primary-btn" data-requires-assets disabled onclick="startNewGamePrompt()">Nouvelle Partie</button>
+        <button class="menu-btn primary-btn" data-requires-assets disabled onclick="startNewGamePrompt()">Mode histoire · Nouvelle partie</button>
+        <button class="menu-btn" data-requires-assets disabled onclick="MizukiTutorial.open(true)">Rejouer le tutoriel Mizuki</button>
         <button class="menu-btn" onclick="openSettingsModal()">Options</button>
       </div>
     </div>
@@ -205,5 +208,6 @@
 
   <script src="js/cards.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/tutorial.js"></script>
 </body>
 </html>

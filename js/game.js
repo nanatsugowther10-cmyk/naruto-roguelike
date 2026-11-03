@@ -1235,9 +1235,7 @@ function continueGame() {
 function startNewGamePrompt() {
   if (!assetsReady) return;
   AudioEngine.init();
-  clearSave();
-  document.getElementById("main-menu").style.display = "none";
-  initNewGame();
+  MizukiTutorial.open();
 }
 
 function initNewGame() {

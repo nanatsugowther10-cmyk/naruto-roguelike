@@ -798,3 +798,20 @@ footer {
 /* Asset preparation feedback */
 #asset-loading-status { font-size: 13px; color: #c9d1d9; margin: 0 0 12px; }
 .menu-btn:disabled { opacity: 0.55; cursor: wait; transform: none; }
+
+/* Mizuki: compact tutorial, scrollable on small screens. */
+#mizuki-tutorial[hidden] { display: none; }
+#mizuki-tutorial { position: fixed; inset: 0; z-index: 220; overflow: auto; background: #0a141f; padding: 20px; color: #f0f6fc; }
+.tutorial-panel { max-width: 900px; margin: auto; text-align: center; }
+.tutorial-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; }
+.tutorial-header h2 { font-size: 20px; }
+.tutorial-panel .menu-btn { padding: 10px 16px; }
+#tutorial-hint { margin: 16px 0; padding: 14px; background: #1b3044; border: 1px solid #f59e0b; border-radius: 8px; }
+.tutorial-arena { display: flex; justify-content: space-around; gap: 12px; padding: 14px 0; }
+.tutorial-naruto { height: 130px; max-width: 140px; object-fit: contain; }
+.tutorial-mizuki { height: 130px; font-size: 90px; }
+#tutorial-hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 14px 0; }
+#tutorial-hand .card { color: #f0f6fc; text-align: left; }
+#tutorial-hand .card:disabled { opacity: .45; cursor: default; transform: none; }
+.tutorial-actions { display: flex; gap: 12px; justify-content: center; padding-bottom: 20px; }
+.tutorial-actions button:disabled { opacity: .45; cursor: default; }
