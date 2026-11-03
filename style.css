@@ -558,16 +558,32 @@ footer {
   inset: 0;
   background: rgba(4, 7, 12, 0.85);
   backdrop-filter: blur(6px);
-  display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
 }
 
-#main-menu { z-index: 200; background: radial-gradient(circle at center, #1b2838 0%, #0a0e14 100%); }
-#settings-modal { z-index: 210; }
-#inspector-modal { z-index: 150; }
-#rest-screen, #overlay { display: none; }
+/* Seul le menu principal doit être affiché au démarrage */
+#main-menu { 
+  display: flex; 
+  z-index: 200; 
+  background: radial-gradient(circle at center, #1b2838 0%, #0a0e14 100%); 
+}
+
+/* Toutes les autres modales doivent être masquées par défaut */
+#settings-modal { 
+  display: none; 
+  z-index: 210; 
+}
+
+#inspector-modal { 
+  display: none; 
+  z-index: 150; 
+}
+
+#rest-screen, #overlay { 
+  display: none; 
+}
 
 .menu-content {
   display: flex;
