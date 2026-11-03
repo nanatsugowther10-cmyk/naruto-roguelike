@@ -194,9 +194,10 @@
     <div class="menu-content">
       <h1 class="menu-title">NARUTO</h1>
       <h2 class="menu-subtitle">Chroniques du Pays des Vagues</h2>
+      <p id="asset-loading-status" role="status" aria-live="polite">Préparation des images…</p>
       <div class="menu-buttons">
-        <button id="btn-continue" class="menu-btn" onclick="continueGame()" style="display: none;">Continuer la mission</button>
-        <button class="menu-btn primary-btn" onclick="startNewGamePrompt()">Nouvelle Partie</button>
+        <button data-requires-assets disabled id="btn-continue" class="menu-btn" onclick="continueGame()" style="display: none;">Continuer la mission</button>
+        <button class="menu-btn primary-btn" data-requires-assets disabled onclick="startNewGamePrompt()">Nouvelle Partie</button>
         <button class="menu-btn" onclick="openSettingsModal()">Options</button>
       </div>
     </div>
