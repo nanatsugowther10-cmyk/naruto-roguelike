@@ -1,0 +1,10 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const els=new Map();const doc={getElementById(id){if(!els.has(id))els.set(id,{style:{},hidden:true});return els.get(id)}};
+let cleared=0,started=0;
+const c=vm.createContext({document:doc,assetsReady:true,AudioEngine:{play(){}},clearSave(){cleared++},initNewGame(){started++}});
+vm.runInContext(fs.readFileSync('js/cards.js','utf8'),c);vm.runInContext(fs.readFileSync('js/tutorial.js','utf8')+'\nthis.t=MizukiTutorial;',c);const t=c.t;t.render=()=>{};
+t.open();t.play(1);assert.equal(t.phase,0);t.endTurn();assert.equal(t.phase,0);t.play(0);assert.equal(t.hp,18);t.play(0);assert.equal(t.shield,6);t.endTurn();assert.equal(t.playerHp,30);assert.equal(t.phase,3);t.play(0);assert.equal(t.clones,2);t.play(0);t.endTurn();assert.equal(t.hp,6);t.play(0);assert.equal(t.hp,0);t.leave(true);assert.equal(started,1);assert.equal(cleared,1);
+for(let phase=0;phase<=4;phase++){t.open();t.phase=phase;t.leave(true)}assert.equal(started,6);
+t.open(true);t.leave(true);assert.equal(started,6);assert.equal(cleared,6);assert.equal(doc.getElementById('main-menu').style.display,'flex');
+t.open();t.phase=4;t.playerHp=1;t.hand=[];t.endTurn();assert.equal(t.playerHp,0);t.open();assert.equal(t.playerHp,30);assert.equal(t.phase,0);t.leave(false);assert.equal(started,6);
+console.log('PASS: guided sequence, blocked invalid actions, victory, skip at every phase, replay isolation, defeat/retry and menu exit');
