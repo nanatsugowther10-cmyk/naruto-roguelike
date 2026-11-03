@@ -69,7 +69,7 @@ function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
 
 function preloadAllAssets() {
   if (assetsPromise) return assetsPromise;
-  const names = ["naruto.png", "brigand.png", "freres_demons.png", "haku.png", "zabuza.png",
+  const names = ["naruto.png", "mizuki.webp", "brigand.png", "freres_demons.png", "haku.png", "zabuza.png",
     ...CARDS_POOL.map(card => card.img)];
   const paths = [...new Set(names.map(imagePath).filter(Boolean))];
   assetsPromise = Promise.all(paths.map(loadImageAsset)).then(results => {

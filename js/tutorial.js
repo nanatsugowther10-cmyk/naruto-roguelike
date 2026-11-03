@@ -94,7 +94,7 @@ const MizukiTutorial = {
         <p id="tutorial-hint" role="status" aria-live="polite">${won ? 'Iruka reconnaît ta valeur. Tu es prêt pour ta première mission !' : lost ? 'Naruto est à terre. Réessaie ou passe directement à l’histoire.' : this.hint()}</p>
         <div class="tutorial-arena">
           <div><img class="tutorial-naruto" src="assets/characters/naruto.png" alt="Naruto"><p>Naruto · ${this.playerHp}/30 PV</p><p>Bouclier : ${this.shield} · Clones : ${this.clones}</p></div>
-          <div><div class="tutorial-mizuki" aria-hidden="true">🥷</div><p>Mizuki · ${this.hp}/24 PV</p><strong>Intention : attaque · 6 dégâts</strong></div>
+          <div><img class="tutorial-mizuki" src="assets/characters/mizuki.webp" alt="Mizuki" width="140" height="130"><p>Mizuki · ${this.hp}/24 PV</p><strong>Intention : attaque · 6 dégâts</strong></div>
         </div>
         <p id="tutorial-message" aria-live="polite">${this.message}</p>
         <p>Chakra : ${this.chakra}/3</p>

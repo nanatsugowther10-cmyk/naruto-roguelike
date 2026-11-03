@@ -809,7 +809,7 @@ footer {
 #tutorial-hint { margin: 16px 0; padding: 14px; background: #1b3044; border: 1px solid #f59e0b; border-radius: 8px; }
 .tutorial-arena { display: flex; justify-content: space-around; gap: 12px; padding: 14px 0; }
 .tutorial-naruto { height: 130px; max-width: 140px; object-fit: contain; }
-.tutorial-mizuki { height: 130px; font-size: 90px; }
+.tutorial-mizuki { width: 140px; height: 130px; max-width: 100%; object-fit: contain; }
 #tutorial-hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 14px 0; }
 #tutorial-hand .card { color: #f0f6fc; text-align: left; }
 #tutorial-hand .card:disabled { opacity: .45; cursor: default; transform: none; }
