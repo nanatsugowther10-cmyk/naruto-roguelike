@@ -830,3 +830,9 @@ body.bg-forest { background: radial-gradient(ellipse at center, #214936 0%, #0a1
 .forest-combat #enemy-box { flex: 1; max-width: 560px; }
 .forest-combat #rewards-picker .menu-btn { white-space: normal; max-width: 330px; }
 @media (max-width: 650px) { .forest-combat #combat-zone { gap: 8px; } .forest-target { min-height: 110px; padding: 7px; font-size: 12px; } }
+
+
+/* Tournament arena uses the same responsive target panels. */
+body.bg-exam { background: radial-gradient(ellipse at center, #725b3d 0%, #20252d 80%); }
+.bg-exam .forest-target { background: #282d37; border-color: #898272; }
+.bg-exam .forest-target[aria-pressed="true"] { border-color: #f59e0b; }

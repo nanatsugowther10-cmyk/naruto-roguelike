@@ -344,7 +344,7 @@ function spawnVFX(type, targetBoxId = "enemy-box") {
 
 function updateNodeMap(currentIndex) {
   if (currentIndex >= 4) {
-    document.getElementById("node-map").innerText = `Forêt de la Mort · Combat ${currentIndex - 3}/6`;
+    document.getElementById("node-map").innerText = currentIndex >= 10 ? `Examen Chūnin · ${currentIndex === 10 ? "Éliminatoires : Kiba" : "Finale : Neji"}` : `Forêt de la Mort · Combat ${currentIndex - 3}/6`;
     return;
   }
   if (!document.getElementById("node-0")) {
@@ -1037,7 +1037,7 @@ let storyPhase = "combat";
 function openRestSite(nextStage = 3) {
   restNextStage = nextStage;
   storyPhase = "rest";
-  document.querySelector(".rest-box h2").innerText = nextStage >= 4 ? "Campement dans la forêt" : "Maison de Tazuna";
+  document.querySelector(".rest-box h2").innerText = nextStage >= 10 ? "Préparation de la finale" : nextStage >= 4 ? "Campement dans la forêt" : "Maison de Tazuna";
   document.querySelector(".rest-box p").innerText = "Récupère 25 PV ou améliore une technique avant le prochain combat.";
   updateNodeMap(nextStage >= 4 ? nextStage : 3);
   saveGame();
@@ -1365,3 +1365,4 @@ window.onload = () => {
     if (btnContinue) btnContinue.style.display = "block";
   }
 };
+

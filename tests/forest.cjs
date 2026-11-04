@@ -12,7 +12,7 @@ function context() {
   return {c, run:s=>vm.runInContext(s,c), a:c.api, document,storage};
 }
 const t=context(), {a,run}=t;
-run('initNewGame()'); assert.equal(a.STAGES.length,10);
+run('initNewGame()'); assert.equal(a.STAGES.length,12);
 // Chapter 1 intentions must show the same move that resolves, not the next entry.
 assert.match(t.document.getElementById('enemy-intent').innerText,/Attaque \(6/);
 run('loadStage(3); state.enemy.hp=0; handleStageVictory()');
@@ -46,4 +46,7 @@ run('continueGame()');assert.equal(a.getPhase(),'rest');run('takeRest()');assert
 run('activeRelic=RELICS_POOL[1];state.player.maxChakra=4;saveGame();continueGame();continueGame()');assert.equal(a.state.player.maxChakra,4);
 run('loadStage(7);Forest.enemies.forEach(e=>e.hp=0);handleStageVictory()');save=JSON.parse(t.storage.get('naruto_deckbuilder_save'));assert.equal(save.storyPhase,'reward');
 run('continueGame()');assert.equal(a.getPhase(),'reward');
-console.log('PASS: 10 encounters, chapter transition, target deaths, illusions, clones, Distraction removal, resonance, constriction, interruption, survival/death precedence, full-deck save, rest/reward resume, relic idempotence');
+console.log('PASS: 12 encounters, chapter transition, target deaths, illusions, clones, Distraction removal, resonance, constriction, interruption, survival/death precedence, full-deck save, rest/reward resume, relic idempotence');
+
+
+module.exports = { context };
