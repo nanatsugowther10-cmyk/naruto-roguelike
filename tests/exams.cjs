@@ -27,7 +27,7 @@ buttons[0].onclick();buttons[0].onclick(); // Double-click must not duplicate th
 assert.equal(a.getPhase(),'rest');
 assert.equal(a.state.deck.filter(c=>c.id==='reserve_chakra').length,1);
 run('continueGame()');assert.equal(a.getPhase(),'rest');
-run('takeRest()');assert.equal(a.getStage(),11);assert.equal(a.state.player.maxChakra,4);
+run('takeRest()');assert.equal(a.getStage(),12);run('loadStage(11)');assert.equal(a.state.player.maxChakra,4);
 // Juken costs one chakra for one player turn, then restores the permanent maximum.
 run('state.player.hp=60;state.player.shield=0;endTurn()');
 assert.equal(a.state.player.chakra,3);assert.equal(a.state.player.maxChakra,4);assert.equal(a.state.player.chakraSeal,1);
@@ -46,9 +46,9 @@ assert(a.state.hand.some(c=>c.id==='garde_concentree'));
 run('state.hand=[{...EXAM_REWARDS[2]}];state.player.chakra=3;state.player.shield=0;playCard(0)');assert.equal(a.state.player.shield,9);assert.equal(a.state.hand.length,0);
 // Reset and save-resume never carry over combat-only chakra seal.
 run('loadStage(11);state.player.chakraSeal=1;saveGame();continueGame()');assert.equal(a.state.player.chakraSeal,0);assert.equal(a.state.player.chakra,4);
-// Finale ends cleanly; no attempt to load a non-existent stage 12.
-run('state.enemy.hp=0;Forest.afterCard()');assert(storage.has('naruto_chunin_complete'));assert(!storage.has('naruto_deckbuilder_save'));
-assert.match(document.getElementById('overlay-title').innerText,/Neji/);
+// The campaign finale at Gaara ends cleanly without loading a missing stage.
+run('loadStage(14);state.enemy.hp=0;Forest.afterCard()');assert(storage.has('naruto_chunin_complete'));assert(!storage.has('naruto_deckbuilder_save'));
+assert.match(document.getElementById('overlay-title').innerText,/Gaara/);
 buttons=document.getElementById('rewards-picker').children;assert.equal(buttons.length,1);assert.match(buttons[0].textContent,/Retour/);
 // Direct chapter start uses a full valid starter even when every Kawarimi is in the hand.
 const d=context();d.c.window.confirm=()=>true;

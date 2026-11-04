@@ -73,12 +73,40 @@ STAGES.filter(stage => stage.forest).forEach(stage => {
   for (const enemy of stage.members || [stage]) enemy.sprite = ENEMY_ART[enemy.name] + ".webp";
 });
 
+// Keep existing indices 10 (Kiba) and 11 (Neji) stable for saved games.
+const KONOHA_STAGES = [
+  { name: 'Jiraiya', icon: '🥷', round: 'Entraînement', maxHp: 999,
+    training: { turns: 4, chakra: 9 },
+    objective: 'Dépense au moins 9 chakra avec tes cartes et résiste à 4 tours.',
+    pattern: [{ intent: 'Mise à l’épreuve · 4 dégâts', dmg: 4 }, { intent: 'Pression · 6 dégâts', dmg: 6 }, { intent: 'Feinte · 3 dégâts', dmg: 3 }] },
+  { name: 'Gamabunta', icon: '🐸', round: 'Entraînement à l’invocation', maxHp: 999,
+    training: { turns: 4, blocked: 18 },
+    objective: 'Absorbe au moins 18 dégâts avec ton bouclier et résiste à 4 tours.',
+    pattern: [{ intent: 'Coup de patte · 10 dégâts', dmg: 10 }, { intent: 'Bond · 14 dégâts', dmg: 14 }, { intent: 'Provocation · 6 dégâts', dmg: 6 }, { intent: 'Épreuve finale · 16 dégâts', dmg: 16 }] },
+  { name: 'Gaara', icon: '🏜️', round: 'Attaque de Konoha', maxHp: 140,
+    objective: 'Traverse sa défense de sable. À mi-vie, Gaara prend une forme de Shukaku plus agressive.',
+    pattern: [{ intent: 'Vague de sable · 10 dégâts', dmg: 10 }, { intent: 'Armure de sable · 12 bouclier', shield: 12 }, { intent: 'Tombeau du désert · 16 dégâts ; interruption à 16', dmg: 16, interrupt: 16 }],
+    secondPattern: [{ intent: 'Griffe de Shukaku · 16 dégâts', dmg: 16 }, { intent: 'Déferlement · 14 bouclier et dissipe les clones', shield: 14, clearClones: true }, { intent: 'Tempête de sable · 4 × 5 dégâts ; interruption à 20', multiHit: 4, hitDmg: 5, interrupt: 20 }] }
+];
+KONOHA_STAGES.forEach(stage => STAGES.push({ ...stage, forest: true, exam: true, bgClass: 'bg-exam', title: `Examen Chūnin et attaque de Konoha · ${stage.round} : ${stage.name}` }));
+STAGES[10].nextStage = 12;
+STAGES[12].nextStage = 13;
+STAGES[13].nextStage = 11;
+STAGES[11].nextStage = 14;
+STAGES[11].objective = 'Surmonte le blocage du chakra et interromps les 64 Paumes.';
+const TRAINING_REWARDS = [
+  { id: 'controle_chakra', name: 'Contrôle du chakra', cost: 0, chakraGain: 1, drawBonus: 1, exhaust: true, type: 'chakra', img: 'card_volonte.png', icon: '🔵', desc: '+1 chakra, pioche 1 carte. Consumée pour ce combat.' },
+  { id: 'garde_invocateur', name: 'Garde de l’invocateur', cost: 1, shield: 12, exhaust: true, type: 'defense', img: 'card_kawarimi.png', icon: '🛡️', desc: '+12 bouclier. Consumée pour ce combat.' },
+  { id: 'renfort_clones', name: 'Renfort de clones', cost: 1, clones: 2, exhaust: true, type: 'clone', img: 'card_clones.png', icon: '👥', desc: 'Invoque 2 clones. Consumée pour ce combat.' }
+];
+
 const Forest = {
-  enemies: [], target: 0, turns: 0, turnDamage: 0, completed: false,
+  enemies: [], target: 0, turns: 0, turnDamage: 0, trainingChakra: 0, trainingBlocked: 0, completed: false,
   active() { return !!STAGES[currentStageIndex]?.forest; },
   alive() { return this.enemies.filter(e => e.hp > 0); },
   move(e) {
-    const move = { ...e.pattern[this.turns % e.pattern.length] };
+    const pattern = e.secondPattern && e.hp <= e.maxHp / 2 ? e.secondPattern : e.pattern;
+    const move = { ...pattern[this.turns % pattern.length] };
     if (move.partnerBonus) {
       const coordinated = this.alive().some(ally => ally.name === 'Akamaru');
       move.dmg += coordinated ? move.partnerBonus : 0;
@@ -87,7 +115,7 @@ const Forest = {
     return move;
   },
   prepare(stage) {
-    this.enemies = []; this.target = 0; this.turns = 0; this.turnDamage = 0; this.completed = false;
+    this.enemies = []; this.target = 0; this.turns = 0; this.turnDamage = 0; this.trainingChakra = 0; this.trainingBlocked = 0; this.completed = false;
     state.player.resonance = 0;
     state.player.chakraSeal = 0;
     document.body.classList.toggle('forest-combat', !!stage.forest);
@@ -106,6 +134,12 @@ const Forest = {
     if (state.enemy.decoys > 0) { state.enemy.decoys--; spawnFloatingText('enemy-box', 'Double dissipé', 'miss'); return true; }
     return false;
   },
+  recordChakraSpent(amount) { if (STAGES[currentStageIndex].training) this.trainingChakra += amount; },
+  recordBlocked(amount) { if (STAGES[currentStageIndex].training) this.trainingBlocked += amount; },
+  trainingWon() {
+    const goal = STAGES[currentStageIndex].training;
+    return goal && this.turns >= goal.turns && this.trainingChakra >= (goal.chakra || 0) && this.trainingBlocked >= (goal.blocked || 0);
+  },
   afterCard() {
     if (!this.alive().length) { this.completed = true; handleStageVictory(); }
     else { this.ensureTarget(); updateUI(); }
@@ -117,7 +151,7 @@ const Forest = {
     root.replaceChildren();
     const stage = STAGES[currentStageIndex];
     const objective = document.createElement('p');
-    objective.textContent = stage.exam ? `${stage.round} · ${stage.name}${stage.members ? ' — mettre Akamaru hors combat réduit les attaques de Kiba.' : ' — Jūken réduit le chakra du prochain tour ; interromps les 64 Paumes.'}` : stage.survival ? `Survis 6 tours · ${this.turns}/6 terminés · dégâts d’interruption : ${this.turnDamage}/18` : `Sélectionne une cible · Parchemins : ${currentStageIndex >= 9 ? 'Terre + Ciel' : currentStageIndex >= 8 ? 'Terre' : '—'}`;
+    objective.textContent = stage.training ? `${stage.objective} Tours : ${this.turns}/${stage.training.turns} · ${stage.training.chakra ? 'Chakra dépensé : ' + this.trainingChakra + '/' + stage.training.chakra : 'Dégâts absorbés : ' + this.trainingBlocked + '/' + stage.training.blocked}` : stage.objective ? stage.objective : stage.exam ? `${stage.round} · ${stage.name}${stage.members ? ' — mettre Akamaru hors combat réduit les attaques de Kiba.' : ' — Jūken réduit le chakra du prochain tour ; interromps les 64 Paumes.'}` : stage.survival ? `Survis 6 tours · ${this.turns}/6 terminés · dégâts d’interruption : ${this.turnDamage}/18` : `Sélectionne une cible · Parchemins : ${currentStageIndex >= 9 ? 'Terre + Ciel' : currentStageIndex >= 8 ? 'Terre' : '—'}`;
     root.appendChild(objective);
     if (state.player.resonance) { const p = document.createElement('p'); p.textContent = 'Résonance : ta prochaine carte de protection donne 4 de bouclier en moins.'; root.appendChild(p); }
     if (state.player.chakraSeal) {
@@ -126,13 +160,16 @@ const Forest = {
     this.enemies.forEach((e, i) => {
       const b = document.createElement('button'); b.className = 'forest-target';
       b.disabled = e.hp <= 0 || busy || storyPhase !== 'combat'; b.setAttribute('aria-pressed', String(i === this.target));
-      const label = stage.survival ? 'Survie · 6 tours' : `${e.hp}/${e.maxHp} PV`;
-      b.textContent = `${e.icon} ${e.name} · ${e.hp <= 0 ? 'Hors combat' : label}\nBouclier : ${e.shield} · Doubles : ${e.decoys}\n${e.hp > 0 ? this.move(e).intent : ''}${e.hp > 0 && this.move(e).interrupt ? '\nInterruption : ' + this.turnDamage + '/' + this.move(e).interrupt : ''}`;
+      const label = stage.training ? 'Entraînement' : stage.survival ? 'Survie · 6 tours' : `${e.hp}/${e.maxHp} PV`;
+      const form = e.secondPattern && e.hp <= e.maxHp / 2 ? ' · Forme de Shukaku' : '';
+      b.textContent = `${e.icon} ${e.name}${form} · ${e.hp <= 0 ? 'Hors combat' : label}\nBouclier : ${e.shield} · Doubles : ${e.decoys}\n${e.hp > 0 ? this.move(e).intent : ''}${e.hp > 0 && this.move(e).interrupt ? '\nInterruption : ' + this.turnDamage + '/' + this.move(e).interrupt : ''}`;
       if (e.sprite) {
         const caption = document.createElement('span'); caption.textContent = b.textContent;
         const portrait = document.createElement('img');
-        portrait.className = 'enemy-portrait'; portrait.alt = ''; portrait.width = 160; portrait.height = 170;
-        b.textContent = ''; b.appendChild(portrait); b.appendChild(caption);
+        portrait.className = 'enemy-portrait' + (e.name === 'Akamaru' ? ' enemy-portrait-small' : ''); portrait.alt = ''; portrait.width = 160; portrait.height = 170;
+        b.textContent = '';
+        const frame = document.createElement('div'); frame.className = 'enemy-art-frame'; frame.appendChild(portrait);
+        b.appendChild(frame); b.appendChild(caption);
         resolveImgSrc(portrait, e.sprite);
       }
       b.onclick = () => { if (busy || storyPhase !== 'combat') return; this.target = i; this.ensureTarget(); updateUI(); };
@@ -175,6 +212,7 @@ const Forest = {
       if (isGameOver) { busy = false; renderClones(); return; }
     }
     this.turns++; this.turnDamage = 0;
+    if (this.trainingWon()) { busy = false; this.completed = true; handleStageVictory(); return; }
     if (STAGES[currentStageIndex].survival && this.turns >= 6) { busy = false; this.completed = true; handleStageVictory(); return; }
     if (!this.alive().length) { busy = false; this.completed = true; handleStageVictory(); return; }
     state.player.shield = 0; state.player.chakraSeal = nextChakraSeal;
@@ -186,7 +224,7 @@ const Forest = {
     this.completed = true; busy = true;
     saveGame();
     const stage = STAGES[currentStageIndex], overlay = document.getElementById('overlay'), picker = document.getElementById('rewards-picker');
-    overlay.style.display = 'flex'; picker.replaceChildren();
+    overlay.style.display = 'flex'; overlay.classList.add('reward-overlay'); picker.replaceChildren();
     document.getElementById('overlay-title').style.color = '#f59e0b';
     document.getElementById('overlay-title').innerText = stage.survival ? 'Forêt de la Mort terminée !' : `Victoire · ${stage.name}`;
     document.getElementById('overlay-sub').innerText = stage.survival ? 'Tu as survécu à Orochimaru. Les deux parchemins sont réunis : accès à la tour validé.' : `${stage.scroll ? 'Parchemin du ' + stage.scroll + ' obtenu. ' : ''}Choisis une technique ou poursuis avec ton deck.`;
@@ -196,11 +234,11 @@ const Forest = {
       if (reward) state.deck.push({ ...reward });
       overlay.style.display = 'none';
       // Full piles are merged by loadStage; the rest choice only changes HP or a card.
-      if ([6, 8, 10].includes(currentStageIndex)) {
+      if ([6, 8, 10, 11, 12, 13].includes(currentStageIndex)) {
         state.deck.push(...state.hand, ...state.discard, ...state.exhausted); state.hand = []; state.discard = []; state.exhausted = [];
         state.deck = state.deck.filter(c => !c.isCurse && !c.temporary);
-        openRestSite(currentStageIndex + 1);
-      } else loadStage(currentStageIndex + 1);
+        openRestSite(stage.nextStage ?? currentStageIndex + 1);
+      } else loadStage(stage.nextStage ?? currentStageIndex + 1);
     };
     const button = (text, action) => { const b = document.createElement('button'); b.className = 'menu-btn'; b.textContent = text; b.onclick = action; picker.appendChild(b); };
     if (stage.survival) {
@@ -211,16 +249,24 @@ const Forest = {
       });
       return;
     }
-    if (currentStageIndex === 11) {
-      localStorage.setItem('naruto_chunin_complete', 'true'); clearSave();
-      document.getElementById('overlay-title').innerText = 'Victoire sur Neji · Examen Chūnin terminé !';
-      document.getElementById('overlay-sub').innerText = 'Les combats de Kiba et Neji sont terminés. La suite du mode histoire reste à venir.';
+    if (currentStageIndex === 14) {
+      localStorage.setItem('naruto_chunin_complete', 'true'); localStorage.setItem('naruto_konoha_complete', 'true'); clearSave();
+      document.getElementById('overlay-title').innerText = 'Victoire sur Gaara · Konoha protégée !';
+      document.getElementById('overlay-sub').innerText = 'Examen Chūnin et attaque de Konoha terminés. La suite du mode histoire reste à venir.';
       button('Retour au menu', () => location.reload()); return;
     }
-    const options = currentStageIndex === 10 ? [...EXAM_REWARDS] : [...REWARD_OPTIONS];
-    if (currentStageIndex !== 10) shuffle(options);
-    options.slice(0,3).forEach(c => button(`${c.name} · ${c.cost} chakra — ${c.desc}`, () => next(c)));
+    const options = stage.training ? [...TRAINING_REWARDS] : currentStageIndex === 10 ? [...EXAM_REWARDS] : [...REWARD_OPTIONS];
+    if (currentStageIndex !== 10 && !stage.training) shuffle(options);
+    options.slice(0,3).forEach(c => {
+      const card = document.createElement('button'); card.type = 'button';
+      card.className = `card reward-card card-${c.type}`;
+      card.setAttribute('aria-label', `${c.name}, ${c.cost} chakra. ${c.desc}`);
+      card.innerHTML = `<div class="card-top"><span class="card-title">${c.name}</span><span class="card-cost">${c.cost}</span></div><div class="card-art"><img class="card-img-el" alt=""><span class="card-art-placeholder">${c.icon || '🎴'}</span></div><div class="card-desc">${c.desc}</div><div class="card-tag">${c.type}</div>`;
+      resolveImgSrc(card.querySelector('img'), c.img, c.icon);
+      card.onclick = () => next(c); picker.appendChild(card);
+    });
     button('Continuer sans ajouter de carte', () => next(null));
+    picker.children[picker.children.length - 1].classList.add('reward-skip');
   },
   enterChapter() {
     document.getElementById('overlay').style.display = 'none';

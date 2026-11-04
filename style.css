@@ -844,3 +844,20 @@ body.bg-exam { background: radial-gradient(ellipse at center, #725b3d 0%, #20252
 @media (max-width: 650px), (max-height: 750px) {
   .enemy-portrait { height: 110px; }
 }
+
+/* Reward choices are illustrated cards; the skip action occupies a separate row. */
+#overlay.reward-overlay .modal-box { max-width: 920px; width: calc(100% - 24px); max-height: 90vh; overflow-y: auto; }
+.reward-overlay #rewards-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 220px)); justify-content: center; align-items: stretch; gap: 18px; padding: 18px 8px; overflow: visible; }
+.reward-overlay .reward-card { width: 100%; min-height: 310px; height: auto; zoom: 1; color: #f0f6fc; font-family: inherit; text-align: left; padding: 12px; }
+.reward-overlay .reward-card .card-top { font-size: 15px; gap: 8px; }
+.reward-overlay .reward-card .card-cost { flex-shrink: 0; width: 26px; height: 26px; font-size: 14px; }
+.reward-overlay .reward-card .card-art { height: 115px; flex-shrink: 0; margin: 12px 0; }
+.reward-overlay .reward-card .card-desc { font-size: 14px; line-height: 1.4; }
+.reward-overlay .reward-card:hover, .reward-overlay .reward-card:focus-visible { transform: translateY(-4px); border-color: #f59e0b; }
+.reward-overlay #rewards-picker .reward-skip { grid-column: 1 / -1; justify-self: center; margin-top: 6px; max-width: 100%; }
+.enemy-art-frame { height: 170px; width: 100%; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 8px; }
+.enemy-art-frame .enemy-portrait { margin: 0; }
+.enemy-art-frame .enemy-portrait-small { height: 76px; width: 110px; max-width: 55%; }
+@media (max-width: 650px), (max-height: 750px) { .enemy-art-frame { height: 110px; } .enemy-art-frame .enemy-portrait-small { height: 50px; width: 75px; } }
+@media (max-width: 600px) { .reward-overlay #rewards-picker { grid-template-columns: minmax(0, 280px); gap: 14px; } .reward-overlay .reward-card { min-height: 290px; } }
+.reward-overlay #rewards-picker > .menu-btn:only-child { grid-column: 1 / -1; justify-self: center; }

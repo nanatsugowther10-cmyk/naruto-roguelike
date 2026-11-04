@@ -345,7 +345,7 @@ function spawnVFX(type, targetBoxId = "enemy-box") {
 
 function updateNodeMap(currentIndex) {
   if (currentIndex >= 4) {
-    document.getElementById("node-map").innerText = currentIndex >= 10 ? `Examen Chūnin · ${currentIndex === 10 ? "Éliminatoires : Kiba" : "Finale : Neji"}` : `Forêt de la Mort · Combat ${currentIndex - 3}/6`;
+    document.getElementById("node-map").innerText = currentIndex >= 10 ? `Examen et Konoha · ${STAGES[currentIndex].name}` : `Forêt de la Mort · Combat ${currentIndex - 3}/6`;
     return;
   }
   if (!document.getElementById("node-0")) {
@@ -405,6 +405,7 @@ function drawCards(n) {
 }
 
 function loadStage(index) {
+  document.getElementById("overlay").classList.remove("reward-overlay");
   currentStageIndex = index;
   storyPhase = "combat";
   const stage = STAGES[index];
@@ -537,6 +538,7 @@ function dealDamageToEnemy(amt, piercing = false) {
     }
   }
 
+  if (STAGES[currentStageIndex].training) state.enemy.hp = Math.max(1, state.enemy.hp);
   checkBossPhaseTransition();
 }
 
@@ -559,6 +561,7 @@ function updateChannelUI() {
 }
 
 function hitPlayer(amt) {
+  if (Forest.active()) Forest.recordBlocked(Math.min(state.player.shield, amt));
   triggerShake("naruto-box");
   let directHpDmg = amt;
 
@@ -627,6 +630,7 @@ function playCard(idx) {
 
   if (Forest.active()) Forest.ensureTarget();
   state.player.chakra -= effectiveCost;
+  if (Forest.active()) Forest.recordChakraSpent(effectiveCost);
   if (effectiveCost === 0 && state.player.nextAttackFree && (card.type === "attaque" || card.type === "taijutsu")) {
     state.player.nextAttackFree = false;
   }
@@ -1234,7 +1238,7 @@ function saveGame(exact = false) {
   };
   if (exact && storyPhase === "combat") {
     saveData.snapshot = JSON.parse(JSON.stringify({ state, forest: Forest.active() ? {
-      enemies: Forest.enemies, target: Forest.target, turns: Forest.turns, turnDamage: Forest.turnDamage
+      enemies: Forest.enemies, target: Forest.target, turns: Forest.turns, turnDamage: Forest.turnDamage, trainingChakra: Forest.trainingChakra, trainingBlocked: Forest.trainingBlocked
     } : null }));
   }
   localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
@@ -1328,7 +1332,7 @@ function initNewGame() {
 function canSaveFromOptions() {
   return document.getElementById("main-menu").style.display === "none" &&
     !MizukiTutorial.active && !isGameOver && (!busy || storyPhase === "reward") &&
-    !(currentStageIndex === 11 && storyPhase === "reward");
+    !(currentStageIndex === 14 && storyPhase === "reward");
 }
 function saveFromOptions() {
   const status = document.getElementById("save-status");
@@ -1352,7 +1356,7 @@ function returnToMainMenu() {
   if (document.getElementById("main-menu").style.display !== "none") {
     closeSettingsModal(); return;
   }
-  if (currentStageIndex === 11 && storyPhase === "reward") { location.reload(); return; }
+  if (currentStageIndex === 14 && storyPhase === "reward") { location.reload(); return; }
   if (storyPhase === "reward" && !isGameOver) {
     try { saveGame(); } catch (_) {
       document.getElementById("save-status").innerText = "Sauvegarde impossible : retour annulé.";
