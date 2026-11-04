@@ -343,6 +343,13 @@ function spawnVFX(type, targetBoxId = "enemy-box") {
 }
 
 function updateNodeMap(currentIndex) {
+  if (currentIndex >= 4) {
+    document.getElementById("node-map").innerText = `Forêt de la Mort · Combat ${currentIndex - 3}/6`;
+    return;
+  }
+  if (!document.getElementById("node-0")) {
+    document.getElementById("node-map").innerHTML = ["⚓ Port", "🌲 Marais", "❄️ Haku", "🍜 Tazuna", "🌉 Zabuza"].map((name, i) => `<div class="node" id="node-${i}"><span class="node-label">${name}</span></div>`).join("");
+  }
   for (let i = 0; i <= 4; i++) {
     const nodeEl = document.getElementById(`node-${i}`);
     if (!nodeEl) continue;
@@ -398,12 +405,13 @@ function drawCards(n) {
 
 function loadStage(index) {
   currentStageIndex = index;
+  storyPhase = "combat";
   const stage = STAGES[index];
 
   busy = false;
   isGameOver = false;
 
-  updateNodeMap(index);
+  updateNodeMap(index >= 4 ? index : index === 3 ? 4 : index);
   document.body.className = stage.bgClass;
 
   const stageTitle = document.getElementById("stage-title");
@@ -423,7 +431,7 @@ function loadStage(index) {
   state.hand = [];
   state.discard = [];
   state.exhausted = [];
-  state.deck = state.deck.filter(c => !c.isCurse);
+  state.deck = state.deck.filter(c => !c.isCurse && !c.temporary);
   shuffle(state.deck);
 
   // Réinitialisation de l'ennemi
@@ -458,8 +466,9 @@ function loadStage(index) {
     activeRelic.onCombatStart(state);
   }
 
+  Forest.prepare(stage);
   const enemyImg = document.getElementById("enemy-img");
-  if (enemyImg) resolveImgSrc(enemyImg, stage.sprite);
+  if (enemyImg && stage.sprite) resolveImgSrc(enemyImg, stage.sprite);
 
   saveGame();
   drawCards(4);
@@ -489,6 +498,7 @@ function checkBossPhaseTransition() {
 }
 
 function dealDamageToEnemy(amt, piercing = false) {
+  if (Forest.absorbDecoy(amt)) return;
   triggerShake("enemy-box");
   let directHpDmg = amt;
 
@@ -614,6 +624,7 @@ function playCard(idx) {
     return;
   }
 
+  if (Forest.active()) Forest.ensureTarget();
   state.player.chakra -= effectiveCost;
   if (effectiveCost === 0 && state.player.nextAttackFree && (card.type === "attaque" || card.type === "taijutsu")) {
     state.player.nextAttackFree = false;
@@ -689,7 +700,11 @@ function playCard(idx) {
   }
 
   if (card.chakraGain) state.player.chakra += card.chakraGain;
-  if (card.shield) state.player.shield += card.shield;
+  if (card.shield) {
+    const reduction = state.player.resonance || 0;
+    state.player.shield += Math.max(0, card.shield - reduction);
+    state.player.resonance = 0;
+  }
   if (card.clones) {
     state.player.clones += card.clones;
     renderClones();
@@ -730,7 +745,9 @@ function playCard(idx) {
   }
 
   const playedCard = state.hand.splice(idx, 1)[0];
-  if (playedCard.exhaust) {
+  if (playedCard.temporary) {
+    // Distraction disappears when played and is never a permanent deck card.
+  } else if (playedCard.exhaust) {
     state.exhausted.push(playedCard);
     spawnFloatingText("naruto-box", "Consumée", "heal");
   } else {
@@ -741,13 +758,15 @@ function playCard(idx) {
   updateUI();
   renderHand();
 
-  if (state.enemy.hp <= 0) handleStageVictory();
+  if (Forest.active()) Forest.afterCard();
+  else if (state.enemy.hp <= 0) handleStageVictory();
 }
 
 // ==========================================
 // 7. FIN DU TOUR (AVEC BOSS PHASE 2 & SUIRYŪDAN)
 // ==========================================
 function endTurn() {
+  if (Forest.active()) { Forest.endTurn(); return; }
   if (isGameOver || busy || state.enemy.hp <= 0) return;
   busy = true;
 
@@ -941,10 +960,11 @@ function updateUI() {
 
   const stage = STAGES[currentStageIndex];
   const activePattern = (stage.hasPhase2 && state.enemy.inPhase2) ? stage.phase2Pattern : stage.pattern;
-  const nextMove = activePattern[state.enemy.turnCount % activePattern.length];
+  const nextMove = activePattern[(state.enemy.turnCount - 1) % activePattern.length];
   const intentEl = document.getElementById("enemy-intent");
   if (intentEl) intentEl.innerText = `Prépare : ${nextMove.intent}`;
 
+  Forest.render();
   updateCounters();
 }
 
@@ -1011,8 +1031,15 @@ function closeInspector(event) {
 // ==========================================
 // 10. REPOS & AMÉLIORATION
 // ==========================================
-function openRestSite() {
-  updateNodeMap(3);
+let restNextStage = 3;
+let storyPhase = "combat";
+
+function openRestSite(nextStage = 3) {
+  restNextStage = nextStage;
+  storyPhase = "rest";
+  document.querySelector(".rest-box h2").innerText = nextStage >= 4 ? "Campement dans la forêt" : "Maison de Tazuna";
+  document.querySelector(".rest-box p").innerText = "Récupère 25 PV ou améliore une technique avant le prochain combat.";
+  updateNodeMap(nextStage >= 4 ? nextStage : 3);
   saveGame();
 
   const restScreen = document.getElementById("rest-screen");
@@ -1033,7 +1060,7 @@ function takeRest() {
   if (restScreen) restScreen.style.display = "none";
 
   updateUI();
-  loadStage(3);
+  loadStage(restNextStage);
 }
 
 function openUpgradePicker() {
@@ -1084,7 +1111,7 @@ function openUpgradePicker() {
       AudioEngine.play("block");
       const restScreen = document.getElementById("rest-screen");
       if (restScreen) restScreen.style.display = "none";
-      loadStage(3);
+      loadStage(restNextStage);
     };
     picker.appendChild(el);
   });
@@ -1109,17 +1136,21 @@ function upgradeCard(cardRef) {
 // 11. VICTOIRES & RÉCOMPENSES
 // ==========================================
 function handleStageVictory() {
+  if (storyPhase === "reward") return;
+  storyPhase = "reward";
+  if (currentStageIndex >= 4) { Forest.reward(); return; }
   const overlay = document.getElementById("overlay");
   overlay.style.display = "flex";
   const picker = document.getElementById("rewards-picker");
   picker.innerHTML = "";
 
-  if (currentStageIndex === STAGES.length - 1) {
-    clearSave();
+  if (currentStageIndex === 3) {
+    localStorage.setItem("naruto_chapter2_unlocked", "true");
+    saveGame();
     document.getElementById("overlay-title").innerText = "VICTOIRE TOTALE SUR LE PAYS DES VAGUES !";
     document.getElementById("overlay-title").style.color = "#f59e0b";
     document.getElementById("overlay-sub").innerText = "Le pont Naruto est achevé. Zabuza a été vaincu !";
-    picker.innerHTML = `<button id="end-turn-btn" style="padding:12px 28px; font-size:15px;" onclick="location.reload()">Retourner au Menu</button>`;
+    picker.innerHTML = `<button id="end-turn-btn" style="padding:12px 28px; font-size:15px;" onclick="Forest.enterChapter()">Continuer · Forêt de la Mort</button>`;
     return;
   }
 
@@ -1190,12 +1221,15 @@ const SAVE_KEY = "naruto_deckbuilder_save";
 function saveGame() {
   if (isGameOver) return;
   const saveData = {
+    version: 2,
+    storyPhase,
+    restNextStage,
     currentStageIndex,
     activeRelicId: activeRelic ? activeRelic.id : null,
     playerHp: state.player.hp,
     playerMaxHp: state.player.maxHp,
     playerWillOfFire: state.player.willOfFire,
-    deck: state.deck
+    deck: [...state.deck, ...state.hand, ...state.discard, ...state.exhausted].filter(c => !c.isCurse && !c.temporary)
   };
   localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
 }
@@ -1220,6 +1254,9 @@ function continueGame() {
   state.player.hp = data.playerHp;
   state.player.maxHp = data.playerMaxHp;
   state.player.willOfFire = !!data.playerWillOfFire;
+  state.player.maxChakra = 3;
+  activeRelic = null;
+  state.hand = []; state.discard = []; state.exhausted = [];
   state.deck = data.deck;
 
   if (data.activeRelicId) {
@@ -1229,7 +1266,10 @@ function continueGame() {
   }
 
   document.getElementById("main-menu").style.display = "none";
+  if (!Number.isInteger(data.currentStageIndex) || !STAGES[data.currentStageIndex]) return;
   loadStage(data.currentStageIndex);
+  if (data.storyPhase === "rest") openRestSite(data.restNextStage || 3);
+  if (data.storyPhase === "reward") handleStageVictory();
 }
 
 function startNewGamePrompt() {
@@ -1239,6 +1279,7 @@ function startNewGamePrompt() {
 }
 
 function initNewGame() {
+  storyPhase = "combat";
   isGameOver = false;
   activeRelic = null;
   state.player.hp = 60;

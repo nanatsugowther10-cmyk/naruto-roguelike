@@ -815,3 +815,18 @@ footer {
 #tutorial-hand .card:disabled { opacity: .45; cursor: default; transform: none; }
 .tutorial-actions { display: flex; gap: 12px; justify-content: center; padding-bottom: 20px; }
 .tutorial-actions button:disabled { opacity: .45; cursor: default; }
+
+
+/* Forest chapter: independently selectable enemies and always visible intentions. */
+body.bg-forest { background: radial-gradient(ellipse at center, #214936 0%, #0a1711 75%); }
+.forest-combat #enemy-box > .sprite-container,
+.forest-combat #enemy-box > .status-panel,
+.forest-combat #enemy-box > .intent-badge { display: none; }
+#forest-targets { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 540px; }
+#forest-targets > p { width: 100%; color: #f0f6fc; font-size: 14px; }
+.forest-target { white-space: pre-line; flex: 1 1 145px; min-height: 160px; padding: 12px; border-radius: 10px; border: 2px solid #52695b; background: #12251d; color: #f0f6fc; font: inherit; line-height: 1.6; cursor: pointer; }
+.forest-target[aria-pressed="true"] { border-color: #f59e0b; box-shadow: 0 0 10px #f59e0b55; }
+.forest-target:disabled { opacity: .55; cursor: default; }
+.forest-combat #enemy-box { flex: 1; max-width: 560px; }
+.forest-combat #rewards-picker .menu-btn { white-space: normal; max-width: 330px; }
+@media (max-width: 650px) { .forest-combat #combat-zone { gap: 8px; } .forest-target { min-height: 110px; padding: 7px; font-size: 12px; } }
