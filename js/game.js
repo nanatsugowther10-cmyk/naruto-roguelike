@@ -70,7 +70,8 @@ function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
 function preloadAllAssets() {
   if (assetsPromise) return assetsPromise;
   const names = ["naruto.png", "mizuki.webp", "brigand.png", "freres_demons.png", "haku.png", "zabuza.png",
-    ...CARDS_POOL.map(card => card.img)];
+    ...CARDS_POOL.map(card => card.img),
+    ...STAGES.flatMap(stage => stage.members ? stage.members.map(enemy => enemy.sprite) : [stage.sprite])];
   const paths = [...new Set(names.map(imagePath).filter(Boolean))];
   assetsPromise = Promise.all(paths.map(loadImageAsset)).then(results => {
     assetsReady = true;
@@ -420,7 +421,7 @@ function loadStage(index) {
   const enemyName = document.getElementById("enemy-name");
   if (enemyName) enemyName.innerText = stage.name;
 
-  if (index <= 1) {
+  if (index < 4) {
     AudioEngine.playMusic("first_level.m4a");
   } else {
     AudioEngine.playMusic("second_level.m4a");
@@ -1326,7 +1327,8 @@ function initNewGame() {
 // ==========================================
 function canSaveFromOptions() {
   return document.getElementById("main-menu").style.display === "none" &&
-    !MizukiTutorial.active && !isGameOver && (!busy || storyPhase === "reward") &&\n    !(currentStageIndex === 11 && storyPhase === "reward");
+    !MizukiTutorial.active && !isGameOver && (!busy || storyPhase === "reward") &&
+    !(currentStageIndex === 11 && storyPhase === "reward");
 }
 function saveFromOptions() {
   const status = document.getElementById("save-status");
@@ -1350,7 +1352,8 @@ function returnToMainMenu() {
   if (document.getElementById("main-menu").style.display !== "none") {
     closeSettingsModal(); return;
   }
-  if (currentStageIndex === 11 && storyPhase === "reward") { location.reload(); return; }\n  if (storyPhase === "reward" && !isGameOver) {
+  if (currentStageIndex === 11 && storyPhase === "reward") { location.reload(); return; }
+  if (storyPhase === "reward" && !isGameOver) {
     try { saveGame(); } catch (_) {
       document.getElementById("save-status").innerText = "Sauvegarde impossible : retour annulé.";
       return;
@@ -1417,4 +1420,3 @@ window.onload = () => {
     if (btnContinue) btnContinue.style.display = "block";
   }
 };
-

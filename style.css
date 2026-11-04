@@ -836,3 +836,11 @@ body.bg-forest { background: radial-gradient(ellipse at center, #214936 0%, #0a1
 body.bg-exam { background: radial-gradient(ellipse at center, #725b3d 0%, #20252d 80%); }
 .bg-exam .forest-target { background: #282d37; border-color: #898272; }
 .bg-exam .forest-target[aria-pressed="true"] { border-color: #f59e0b; }
+
+/* Transparent enemy art preserves aspect ratio and always faces Naruto on the left. */
+.enemy-portrait { display: block; width: 100%; height: 170px; object-fit: contain; object-position: center bottom; margin: 0 auto 8px; pointer-events: none; }
+.forest-target > span { display: block; }
+.forest-target:disabled .enemy-portrait { filter: grayscale(1); }
+@media (max-width: 650px), (max-height: 750px) {
+  .enemy-portrait { height: 110px; }
+}

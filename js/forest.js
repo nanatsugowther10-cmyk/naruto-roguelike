@@ -53,6 +53,26 @@ const EXAM_REWARDS = [
   { id: 'garde_concentree', name: 'Garde concentrée', cost: 1, shield: 9, retain: true, type: 'defense', icon: '🛡️', img: 'card_kawarimi.png', desc: '+9 bouclier. Reste en main si elle n’est pas jouée.' }
 ];
 
+const ENEMY_ART = {
+  "Éclaireur rival": "eclaireur_rival",
+  "Serpent géant": "serpent_geant",
+  "Assaillant": "assaillant_rival",
+  "Soutien": "soutien_rival",
+  "Zaku": "zaku",
+  "Kin": "kin",
+  "Dosu": "dosu",
+  "Oboro": "oboro",
+  "Kagari": "kagari",
+  "Mubi": "mubi",
+  "Orochimaru": "orochimaru",
+  "Kiba": "kiba",
+  "Akamaru": "akamaru",
+  "Neji Hyūga": "neji"
+};
+STAGES.filter(stage => stage.forest).forEach(stage => {
+  for (const enemy of stage.members || [stage]) enemy.sprite = ENEMY_ART[enemy.name] + ".webp";
+});
+
 const Forest = {
   enemies: [], target: 0, turns: 0, turnDamage: 0, completed: false,
   active() { return !!STAGES[currentStageIndex]?.forest; },
@@ -108,6 +128,13 @@ const Forest = {
       b.disabled = e.hp <= 0 || busy || storyPhase !== 'combat'; b.setAttribute('aria-pressed', String(i === this.target));
       const label = stage.survival ? 'Survie · 6 tours' : `${e.hp}/${e.maxHp} PV`;
       b.textContent = `${e.icon} ${e.name} · ${e.hp <= 0 ? 'Hors combat' : label}\nBouclier : ${e.shield} · Doubles : ${e.decoys}\n${e.hp > 0 ? this.move(e).intent : ''}${e.hp > 0 && this.move(e).interrupt ? '\nInterruption : ' + this.turnDamage + '/' + this.move(e).interrupt : ''}`;
+      if (e.sprite) {
+        const caption = document.createElement('span'); caption.textContent = b.textContent;
+        const portrait = document.createElement('img');
+        portrait.className = 'enemy-portrait'; portrait.alt = ''; portrait.width = 160; portrait.height = 170;
+        b.textContent = ''; b.appendChild(portrait); b.appendChild(caption);
+        resolveImgSrc(portrait, e.sprite);
+      }
       b.onclick = () => { if (busy || storyPhase !== 'combat') return; this.target = i; this.ensureTarget(); updateUI(); };
       root.appendChild(b);
     });
@@ -219,4 +246,3 @@ const Forest = {
     this.enterChapter();
   }
 };
-
