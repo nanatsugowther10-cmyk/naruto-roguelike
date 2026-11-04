@@ -1218,7 +1218,7 @@ function handleStageVictory() {
 // ==========================================
 const SAVE_KEY = "naruto_deckbuilder_save";
 
-function saveGame() {
+function saveGame(exact = false) {
   if (isGameOver) return;
   const saveData = {
     version: 2,
@@ -1231,6 +1231,11 @@ function saveGame() {
     playerWillOfFire: state.player.willOfFire,
     deck: [...state.deck, ...state.hand, ...state.discard, ...state.exhausted].filter(c => !c.isCurse && !c.temporary)
   };
+  if (exact && storyPhase === "combat") {
+    saveData.snapshot = JSON.parse(JSON.stringify({ state, forest: Forest.active() ? {
+      enemies: Forest.enemies, target: Forest.target, turns: Forest.turns, turnDamage: Forest.turnDamage
+    } : null }));
+  }
   localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
 }
 
@@ -1268,6 +1273,17 @@ function continueGame() {
   document.getElementById("main-menu").style.display = "none";
   if (!Number.isInteger(data.currentStageIndex) || !STAGES[data.currentStageIndex]) return;
   loadStage(data.currentStageIndex);
+  if (data.snapshot && data.storyPhase === "combat") {
+    Object.assign(state, data.snapshot.state);
+    if (data.snapshot.forest && Forest.active()) {
+      Object.assign(Forest, data.snapshot.forest);
+      Forest.ensureTarget();
+    }
+    renderClones(); renderHand(); updateUI(); updateChannelUI();
+    document.getElementById("dense-mist-overlay").classList.toggle("active", !!state.enemy.denseMist);
+    document.getElementById("enemy-box").classList.toggle("demon-aura", !!state.enemy.inPhase2);
+    saveGame(true);
+  }
   if (data.storyPhase === "rest") openRestSite(data.restNextStage || 3);
   if (data.storyPhase === "reward") handleStageVictory();
 }
@@ -1308,7 +1324,43 @@ function initNewGame() {
 // ==========================================
 // 13. PARAMÈTRES / OPTIONS
 // ==========================================
+function canSaveFromOptions() {
+  return document.getElementById("main-menu").style.display === "none" &&
+    !MizukiTutorial.active && !isGameOver && (!busy || storyPhase === "reward") &&\n    !(currentStageIndex === 11 && storyPhase === "reward");
+}
+function saveFromOptions() {
+  const status = document.getElementById("save-status");
+  if (!canSaveFromOptions()) {
+    status.innerText = "Sauvegarde indisponible ici. Termine l’action en cours.";
+    return false;
+  }
+  try {
+    saveGame(true);
+    status.innerText = "Partie sauvegardée dans ce navigateur.";
+    return true;
+  } catch (_) {
+    status.innerText = "La sauvegarde a échoué. Vérifie le stockage de ton navigateur.";
+    return false;
+  }
+}
+function returnToMainMenu() {
+  if (MizukiTutorial.active) {
+    MizukiTutorial.leave(false); closeSettingsModal(); return;
+  }
+  if (document.getElementById("main-menu").style.display !== "none") {
+    closeSettingsModal(); return;
+  }
+  if (currentStageIndex === 11 && storyPhase === "reward") { location.reload(); return; }\n  if (storyPhase === "reward" && !isGameOver) {
+    try { saveGame(); } catch (_) {
+      document.getElementById("save-status").innerText = "Sauvegarde impossible : retour annulé.";
+      return;
+    }
+  } else if (!isGameOver && !saveFromOptions()) return;
+  location.reload();
+}
 function openSettingsModal() {
+  document.getElementById("save-status").innerText = "";
+  document.getElementById("btn-save-game").disabled = !canSaveFromOptions();
   document.getElementById("settings-modal").style.display = "flex";
 }
 

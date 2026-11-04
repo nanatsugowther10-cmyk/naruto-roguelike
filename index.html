@@ -183,7 +183,10 @@
           </select>
         </div>
       </div>
-      <div class="settings-footer">
+      <p id="save-status" role="status" aria-live="polite"></p>
+      <div class="settings-footer" style="flex-wrap:wrap;gap:8px;">
+        <button id="btn-save-game" class="menu-btn" onclick="saveFromOptions()">Sauvegarder</button>
+        <button class="menu-btn" onclick="returnToMainMenu()">Retour au menu principal</button>
         <button class="menu-btn" style="padding: 8px 22px; font-size: 13px;" onclick="closeSettingsModal()">Fermer</button>
       </div>
     </div>

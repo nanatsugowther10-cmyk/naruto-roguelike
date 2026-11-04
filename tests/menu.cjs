@@ -1,0 +1,11 @@
+const assert=require('assert/strict'),{context}=require('./forest.cjs');
+const t=context(),{a,run,storage,document}=t;let reloads=0;t.c.location.reload=()=>reloads++;
+run('initNewGame();document.getElementById("main-menu").style.display="none";loadStage(10);state.player.hp=41;state.player.chakra=1;state.player.clones=2;Forest.turns=2;Forest.target=1;Forest.ensureTarget();dealDamageToEnemy(7);saveFromOptions()');
+const saved=JSON.parse(storage.get('naruto_deckbuilder_save'));assert(saved.snapshot);const before=JSON.stringify(saved.snapshot);
+run('continueGame()');assert.equal(a.state.player.hp,41);assert.equal(a.state.player.chakra,1);assert.equal(a.state.enemy.hp,19);assert.equal(a.Forest.turns,2);assert.equal(a.Forest.target,1);
+assert.equal(JSON.stringify(JSON.parse(storage.get('naruto_deckbuilder_save')).snapshot),before);
+run('returnToMainMenu()');assert.equal(reloads,1);
+run('busy=true;returnToMainMenu()');assert.equal(reloads,1);
+run('busy=false;loadStage(3);state.enemy.inPhase2=true;state.enemy.isChanneling=true;state.enemy.channelDmgTaken=8;state.enemy.channelDmgRequired=18;state.enemy.channelSpellDmg=28;saveFromOptions();continueGame()');assert(a.state.enemy.inPhase2);assert(a.state.enemy.isChanneling);assert.equal(a.state.enemy.channelDmgTaken,8);
+const old=storage.get('naruto_deckbuilder_save');t.c.localStorage.setItem=()=>{throw Error('storage full')};assert.equal(run('saveFromOptions()'),false);run('returnToMainMenu()');assert.equal(reloads,1);assert.equal(storage.get('naruto_deckbuilder_save'),old);
+console.log('PASS: exact manual save/resume, target/turn/deck state, boss channel, return autosave, busy guard and storage failure protection');
