@@ -1,0 +1,21 @@
+name: Sync to Google Drive
+
+on:
+  push:
+    branches:
+      - main # Remplacez par 'master' ou votre branche principale si besoin
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Push to Google Drive
+        uses: guillep2k/gitub-to-drive@latest
+        env:
+          GOOGLE_KEY: ${{ secrets.GOOGLE_KEY }}
+          GDRIVE_FOLDERID: ${{ secrets.GDRIVE_FOLDERID }}
+          GIT_ORIGIN: origin/main
+          GIT_SUBDIR: "." # Mettez un sous-dossier spécifique si vous ne voulez pas tout synchroniser
