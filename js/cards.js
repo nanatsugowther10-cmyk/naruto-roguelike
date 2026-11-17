@@ -1,5 +1,28 @@
 // ==========================================
-// 1. CARTES DE BASE & NOUVELLES TECHNIQUES
+// 1. CONFIGURATION & CONSTANTES DU JEU
+// ==========================================
+const GAME_CONFIG = {
+  startingHp: 60,
+  startingChakra: 3,
+  baseDrawCount: 4,
+  maxVisibleClones: 4,
+  cloneDamagePerClone: 3,
+  restHealAmount: 25,
+  willOfFireBonus: 4,
+  finisherMinCards: 2,
+  finisherBonusDmg: 8,
+  finisherBonusShield: 5,
+  fumaCloneThreshold: 2,
+  fumaBonusDmg: 22,
+  rendanCloneBonus: 4,
+  mistMissChance: 0.50,
+  denseMistMissChance: 0.60,
+  denseMistCloneMissChance: 0.15,
+  saveKey: "naruto_deckbuilder_save"
+};
+
+// ==========================================
+// 2. POOL DE CARTES DE BASE & TECHNIQUES
 // ==========================================
 const CARDS_POOL = [
   // --- Cartes de départ ---
@@ -65,8 +88,7 @@ const CARDS_POOL = [
     icon: "🦊"
   },
 
-  // --- NOUVELLES TECHNIQUES AVANCÉES ---
-  // Séquence (Ouverture)
+  // --- Techniques avancées ---
   {
     id: "feinte_kunai",
     name: "Feinte au Kunai",
@@ -78,7 +100,6 @@ const CARDS_POOL = [
     img: "card_fuma.png",
     icon: "🗡️"
   },
-  // Séquence (Finisher)
   {
     id: "tornade_konoha",
     name: "Tornade de Konoha",
@@ -90,7 +111,6 @@ const CARDS_POOL = [
     img: "card_poing.png",
     icon: "🌪️"
   },
-  // Sacrifice de Clone
   {
     id: "bouclier_clone",
     name: "Clone Bouclier",
@@ -102,7 +122,6 @@ const CARDS_POOL = [
     img: "card_kawarimi.png",
     icon: "🛡️"
   },
-  // Sacrifice de Clone & Anti-Brouillard
   {
     id: "clone_explosif",
     name: "Clone Piégé",
@@ -115,7 +134,6 @@ const CARDS_POOL = [
     img: "card_clones.png",
     icon: "💥"
   },
-  // Rétention (Mudrâ)
   {
     id: "mook_mudra",
     name: "Concentration Mudrâ",
@@ -127,7 +145,6 @@ const CARDS_POOL = [
     img: "card_volonte.png",
     icon: "🧘"
   },
-  // Éphémère (Exhaust)
   {
     id: "pilule_militaire",
     name: "Pilule Militaire",
@@ -140,7 +157,6 @@ const CARDS_POOL = [
     img: "card_chakra_rouge.png",
     icon: "💊"
   },
-  // Éphémère Perce-Bouclier
   {
     id: "parchemin_scelle",
     name: "Parchemin Explosif",
@@ -203,7 +219,7 @@ const CARDS_POOL = [
 ];
 
 // ==========================================
-// 2. FLÉAUX DE BOSS
+// 3. FLÉAUX DE BOSS
 // ==========================================
 const CURSE_POOL = {
   senbon: {
@@ -230,22 +246,10 @@ const CURSE_POOL = {
   }
 };
 
-const REWARD_OPTIONS = [
-  CARDS_POOL[5],
-  CARDS_POOL[6],
-  CARDS_POOL[7],
-  CARDS_POOL[8],
-  CARDS_POOL[9],
-  CARDS_POOL[10],
-  CARDS_POOL[11],
-  CARDS_POOL[12],
-  CARDS_POOL[13],
-  CARDS_POOL[14],
-  CARDS_POOL[15]
-];
+const REWARD_OPTIONS = CARDS_POOL.slice(5);
 
 // ==========================================
-// 3. RELIQUES
+// 4. RELIQUES
 // ==========================================
 const RELICS_POOL = [
   {
@@ -273,7 +277,7 @@ const RELICS_POOL = [
 ];
 
 // ==========================================
-// 4. ÉTAPES & BOSS PATTERNS (PHASE 1 & PHASE 2)
+// 5. ÉTAPES & BOSS PATTERNS (ARC PAYS DES VAGUES)
 // ==========================================
 const STAGES = [
   {

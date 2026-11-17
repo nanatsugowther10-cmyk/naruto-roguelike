@@ -1,7 +1,43 @@
 // ==========================================
+// 0. CORE ARCHITECTURE (EVENTBUS & TIMER MANAGER)
+// ==========================================
+const EventBus = {
+  listeners: new Map(),
+  on(event, fn) {
+    if (!this.listeners.has(event)) this.listeners.set(event, new Set());
+    this.listeners.get(event).add(fn);
+    return () => this.off(event, fn);
+  },
+  off(event, fn) {
+    if (this.listeners.has(event)) this.listeners.get(event).delete(fn);
+  },
+  emit(event, payload = {}) {
+    if (!this.listeners.has(event)) return;
+    for (const fn of [...this.listeners.get(event)]) {
+      try { fn(payload); } catch (_) { /* isolate listener errors */ }
+    }
+  }
+};
+
+const TimerManager = {
+  timers: new Set(),
+  set(fn, delay) {
+    const id = setTimeout(() => {
+      this.timers.delete(id);
+      fn();
+    }, delay);
+    this.timers.add(id);
+    return id;
+  },
+  clearAll() {
+    for (const id of this.timers) clearTimeout(id);
+    this.timers.clear();
+  }
+};
+
+// ==========================================
 // 1. CHARGEMENT ET PRÉPARATION DES IMAGES
 // ==========================================
-// Keep the Image objects alive and share loading/decoding across all callers.
 const imageAssets = new Map();
 let assetsReady = false;
 let assetsPromise;
@@ -9,7 +45,6 @@ let assetsPromise;
 function imagePath(originalPath) {
   if (!originalPath) return null;
   const filename = originalPath.split('/').pop();
-  // These curse cards deliberately use their emoji until artwork is available.
   if (filename === "card_miroir.png") return null;
   if (filename.startsWith("card_")) {
     return `assets/cards/${filename.replace(/\.png$/, ".webp")}`;
@@ -30,7 +65,6 @@ function loadImageAsset(path) {
       img.onload = img.onerror = null;
       resolve(ok ? img : null);
     };
-    // A failed or stalled asset must never trap the user at the menu.
     const timer = setTimeout(() => finish(false), 15000);
     img.onerror = () => finish(false);
     img.onload = async () => {
@@ -44,24 +78,24 @@ function loadImageAsset(path) {
 }
 
 function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
+  if (!imgElement) return;
   const path = imagePath(originalPath);
   const placeholder = imgElement.nextElementSibling;
   const showPlaceholder = () => {
     imgElement.style.display = "none";
-    if (placeholder && placeholder.classList.contains("card-art-placeholder")) {
+    if (placeholder && placeholder.classList && placeholder.classList.contains("card-art-placeholder")) {
       placeholder.textContent = fallbackEmoji || "🎴";
       placeholder.style.display = "block";
     }
   };
   showPlaceholder();
-  imgElement.dataset.assetPath = path || "";
+  if (imgElement.dataset) imgElement.dataset.assetPath = path || "";
   if (!path) return;
   loadImageAsset(path).then(img => {
-    // Ignore stale loads if an enemy image changed in the meantime.
-    if (!img || imgElement.dataset.assetPath !== path) return;
+    if (!img || (imgElement.dataset && imgElement.dataset.assetPath !== path)) return;
     imgElement.src = img.src;
     imgElement.style.display = "";
-    if (placeholder && placeholder.classList.contains("card-art-placeholder")) {
+    if (placeholder && placeholder.classList && placeholder.classList.contains("card-art-placeholder")) {
       placeholder.style.display = "none";
     }
   });
@@ -69,71 +103,114 @@ function resolveImgSrc(imgElement, originalPath, fallbackEmoji = null) {
 
 function preloadAllAssets() {
   if (assetsPromise) return assetsPromise;
-  const names = ["naruto.png", "mizuki.webp", "brigand.png", "freres_demons.png", "haku.png", "zabuza.png",
+  const names = [
+    "naruto.png", "mizuki.webp", "brigand.png", "freres_demons.png", "haku.png", "zabuza.png",
     ...CARDS_POOL.map(card => card.img),
-    ...STAGES.flatMap(stage => stage.members ? stage.members.map(enemy => enemy.sprite) : [stage.sprite])];
+    ...STAGES.flatMap(stage => stage.members ? stage.members.map(enemy => enemy.sprite) : [stage.sprite])
+  ];
   const paths = [...new Set(names.map(imagePath).filter(Boolean))];
   assetsPromise = Promise.all(paths.map(loadImageAsset)).then(results => {
     assetsReady = true;
     document.querySelectorAll("[data-requires-assets]").forEach(btn => { btn.disabled = false; });
     const status = document.getElementById("asset-loading-status");
-    if (status) status.textContent = results.some(img => !img)
-      ? "Certaines images sont indisponibles. Tu peux quand même jouer." : "";
+    if (status) {
+      status.textContent = results.some(img => !img)
+        ? "Certaines images sont indisponibles. Tu peux quand même jouer."
+        : "";
+    }
     return results;
   });
   return assetsPromise;
 }
 
 // ==========================================
-// 2. MOTEUR AUDIO (M4A & MP3 DYNAMIQUES)
+// 2. MOTEUR AUDIO (BUS MIXER, PITCH VARIATION & DUCKING)
 // ==========================================
 const AudioEngine = {
   ctx: null,
+  masterGain: null,
+  sfxGain: null,
   musicAudio: null,
   currentTrack: null,
+  duckFactor: 1.0,
+  duckTimer: null,
   settings: {
     master: 0.8,
     music: 0.4,
     sfx: 0.8
   },
 
+  perceptualGain(sliderVal) {
+    const v = Math.max(0, Math.min(1, sliderVal));
+    return v <= 0.001 ? 0 : Math.pow(v, 1.6);
+  },
+
   init() {
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
       this.ctx = new AudioCtx();
+      this.masterGain = this.ctx.createGain();
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.connect(this.masterGain);
+      this.masterGain.connect(this.ctx.destination);
+      this.updateVolumes();
     }
-    if (this.ctx.state === "suspended") this.ctx.resume();
+    if (this.ctx && this.ctx.state === "suspended") {
+      this.ctx.resume().catch(() => {});
+    }
   },
 
-  play(type) {
+  pitchJitter(baseFreq, spread = 0.06) {
+    return baseFreq * (1 + (Math.random() * 2 - 1) * spread);
+  },
+
+  duckMusic(durationMs = 650, targetRatio = 0.35) {
+    this.duckFactor = targetRatio;
+    this.updateVolumes();
+    if (this.duckTimer) clearTimeout(this.duckTimer);
+    this.duckTimer = setTimeout(() => {
+      this.duckFactor = 1.0;
+      this.updateVolumes();
+      this.duckTimer = null;
+    }, durationMs);
+  },
+
+  play(type, opts = {}) {
     this.init();
+    if (!this.ctx) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;
-    const sfxVol = this.settings.master * this.settings.sfx;
+    const sfxVol = this.perceptualGain(this.settings.master) * this.perceptualGain(this.settings.sfx);
     if (sfxVol <= 0.001) return;
+
+    const out = this.sfxGain || ctx.destination;
+    const pitchMult = opts.pitchMult || 1.0;
 
     if (type === "hit") {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "triangle";
-      osc.frequency.setValueAtTime(140, now);
-      osc.frequency.exponentialRampToValueAtTime(30, now + 0.12);
-      gain.gain.setValueAtTime(0.4 * sfxVol, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-      osc.connect(gain); gain.connect(ctx.destination);
+      const startFreq = this.pitchJitter(145 * pitchMult);
+      osc.frequency.setValueAtTime(startFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(32, now + 0.12);
+      gain.gain.setValueAtTime(0.42 * sfxVol, now);
+      gain.gain.exponentialRampToValueAtTime(0.008, now + 0.12);
+      osc.connect(gain); gain.connect(out);
       osc.start(now); osc.stop(now + 0.12);
     } else if (type === "block") {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
-      osc.frequency.setValueAtTime(220, now);
-      osc.frequency.exponentialRampToValueAtTime(90, now + 0.18);
-      gain.gain.setValueAtTime(0.35 * sfxVol, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
-      osc.connect(gain); gain.connect(ctx.destination);
+      const startFreq = this.pitchJitter(230 * pitchMult);
+      osc.frequency.setValueAtTime(startFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(95, now + 0.18);
+      gain.gain.setValueAtTime(0.36 * sfxVol, now);
+      gain.gain.exponentialRampToValueAtTime(0.008, now + 0.18);
+      osc.connect(gain); gain.connect(out);
       osc.start(now); osc.stop(now + 0.18);
     } else if (type === "clone") {
-      const bufferSize = ctx.sampleRate * 0.15;
+      const bufferSize = Math.floor(ctx.sampleRate * 0.15);
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
@@ -141,52 +218,56 @@ const AudioEngine = {
       noise.buffer = buffer;
       const filter = ctx.createBiquadFilter();
       filter.type = "bandpass";
-      filter.frequency.setValueAtTime(800, now);
-      filter.frequency.linearRampToValueAtTime(250, now + 0.15);
+      filter.frequency.setValueAtTime(this.pitchJitter(820), now);
+      filter.frequency.linearRampToValueAtTime(240, now + 0.15);
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.3 * sfxVol, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-      noise.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.32 * sfxVol, now);
+      gain.gain.exponentialRampToValueAtTime(0.008, now + 0.15);
+      noise.connect(filter); filter.connect(gain); gain.connect(out);
       noise.start(now);
     } else if (type === "slash") {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(900, now);
-      osc.frequency.exponentialRampToValueAtTime(180, now + 0.14);
-      gain.gain.setValueAtTime(0.25 * sfxVol, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
-      osc.connect(gain); gain.connect(ctx.destination);
+      const startFreq = this.pitchJitter(920 * pitchMult);
+      osc.frequency.setValueAtTime(startFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(175, now + 0.14);
+      gain.gain.setValueAtTime(0.26 * sfxVol, now);
+      gain.gain.exponentialRampToValueAtTime(0.008, now + 0.14);
+      osc.connect(gain); gain.connect(out);
       osc.start(now); osc.stop(now + 0.14);
     } else if (type === "kyubi") {
+      this.duckMusic(550, 0.45);
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(90, now);
-      osc.frequency.linearRampToValueAtTime(45, now + 0.35);
+      osc.frequency.setValueAtTime(95, now);
+      osc.frequency.linearRampToValueAtTime(42, now + 0.35);
       gain.gain.setValueAtTime(0.5 * sfxVol, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-      osc.connect(gain); gain.connect(ctx.destination);
+      gain.gain.exponentialRampToValueAtTime(0.008, now + 0.35);
+      osc.connect(gain); gain.connect(out);
       osc.start(now); osc.stop(now + 0.35);
     } else if (type === "water_dragon") {
+      this.duckMusic(850, 0.25);
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(160, now);
-      osc.frequency.exponentialRampToValueAtTime(40, now + 0.55);
-      gain.gain.setValueAtTime(0.6 * sfxVol, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
-      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(165, now);
+      osc.frequency.exponentialRampToValueAtTime(38, now + 0.55);
+      gain.gain.setValueAtTime(0.58 * sfxVol, now);
+      gain.gain.exponentialRampToValueAtTime(0.008, now + 0.55);
+      osc.connect(gain); gain.connect(out);
       osc.start(now); osc.stop(now + 0.55);
     } else if (type === "break") {
+      this.duckMusic(600, 0.35);
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
-      osc.frequency.setValueAtTime(600, now);
-      osc.frequency.exponentialRampToValueAtTime(1200, now + 0.25);
+      osc.frequency.setValueAtTime(620, now);
+      osc.frequency.exponentialRampToValueAtTime(1260, now + 0.25);
       gain.gain.setValueAtTime(0.5 * sfxVol, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-      osc.connect(gain); gain.connect(ctx.destination);
+      gain.gain.exponentialRampToValueAtTime(0.008, now + 0.25);
+      osc.connect(gain); gain.connect(out);
       osc.start(now); osc.stop(now + 0.25);
     }
   },
@@ -196,7 +277,7 @@ const AudioEngine = {
     this.currentTrack = filename;
 
     const baseName = filename.replace(/\.(m4a|mp3)$/, "");
-    const targetVolume = this.settings.master * this.settings.music;
+    const targetVolume = this.perceptualGain(this.settings.master) * this.perceptualGain(this.settings.music) * this.duckFactor;
 
     const candidatePaths = [
       `assets/audio/${baseName}.m4a`,
@@ -227,13 +308,17 @@ const AudioEngine = {
       }
     };
 
-    audio.play().catch(() => {});
+    if (!document.hidden) {
+      audio.play().catch(() => {});
+    }
     this.musicAudio = audio;
   },
 
   updateVolumes() {
     if (this.musicAudio) {
-      this.musicAudio.volume = this.settings.master * this.settings.music;
+      this.musicAudio.volume = Math.max(0, Math.min(1,
+        this.perceptualGain(this.settings.master) * this.perceptualGain(this.settings.music) * this.duckFactor
+      ));
     }
   }
 };
@@ -241,6 +326,26 @@ const AudioEngine = {
 // ==========================================
 // 3. ÉTAT GLOBAL
 // ==========================================
+const cfg = typeof GAME_CONFIG !== "undefined" ? GAME_CONFIG : {
+  startingHp: 60,
+  startingChakra: 3,
+  baseDrawCount: 4,
+  maxVisibleClones: 4,
+  cloneDamagePerClone: 3,
+  restHealAmount: 25,
+  willOfFireBonus: 4,
+  finisherMinCards: 2,
+  finisherBonusDmg: 8,
+  finisherBonusShield: 5,
+  fumaCloneThreshold: 2,
+  fumaBonusDmg: 22,
+  rendanCloneBonus: 4,
+  mistMissChance: 0.50,
+  denseMistMissChance: 0.60,
+  denseMistCloneMissChance: 0.15,
+  saveKey: "naruto_deckbuilder_save"
+};
+
 let currentStageIndex = 0;
 let activeRelic = null;
 let isGameOver = false;
@@ -248,11 +353,11 @@ let busy = false;
 
 const state = {
   player: {
-    hp: 60,
-    maxHp: 60,
+    hp: cfg.startingHp,
+    maxHp: cfg.startingHp,
     shield: 0,
-    chakra: 3,
-    maxChakra: 3,
+    chakra: cfg.startingChakra,
+    maxChakra: cfg.startingChakra,
     clones: 0,
     willOfFire: false,
     cardsPlayedThisTurn: 0,
@@ -278,8 +383,107 @@ const state = {
 };
 
 // ==========================================
-// 4. ANIMATIONS & VISUELS (VFX)
+// 4. ORCHESTRATEUR GAME FEEL & JUICE (TRAUMA SHAKE, HIT-FLASH, BURST)
 // ==========================================
+const JuiceFX = {
+  trauma: 0,
+  rafId: null,
+  time: 0,
+
+  addTrauma(amount) {
+    if (document.body && document.body.classList && document.body.classList.contains("reduce-motion")) return;
+    this.trauma = Math.min(1, this.trauma + amount);
+    if (!this.rafId && typeof requestAnimationFrame === "function") {
+      this.rafId = requestAnimationFrame(() => this.tick());
+    }
+  },
+
+  tick() {
+    this.rafId = null;
+    if (this.trauma <= 0.005) {
+      this.trauma = 0;
+      if (document.documentElement && document.documentElement.style) {
+        document.documentElement.style.setProperty("--shake-x", "0px");
+        document.documentElement.style.setProperty("--shake-y", "0px");
+      }
+      return;
+    }
+    this.trauma = Math.max(0, this.trauma - 0.055);
+    const shake = this.trauma * this.trauma;
+    this.time += 0.75;
+    const ox = (Math.sin(this.time * 1.9) * 11 * shake).toFixed(2);
+    const oy = (Math.cos(this.time * 2.5) * 7 * shake).toFixed(2);
+    if (document.documentElement && document.documentElement.style) {
+      document.documentElement.style.setProperty("--shake-x", `${ox}px`);
+      document.documentElement.style.setProperty("--shake-y", `${oy}px`);
+    }
+    if (typeof requestAnimationFrame === "function") {
+      this.rafId = requestAnimationFrame(() => this.tick());
+    }
+  },
+
+  popStat(elId) {
+    const el = document.getElementById(elId);
+    if (!el || !el.classList) return;
+    el.classList.remove("stat-pop");
+    void el.offsetWidth;
+    el.classList.add("stat-pop");
+  },
+
+  flashBox(boxId) {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    const target = box.querySelector ? (box.querySelector(".fighter-sprite") || box) : box;
+    if (!target || !target.classList) return;
+    target.classList.remove("hit-flash");
+    void target.offsetWidth;
+    target.classList.add("hit-flash");
+  },
+
+  spawnBurst(boxId, variant = "hit", count = 6) {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement("div");
+      p.className = `vfx-burst vfx-burst-${variant}`;
+      const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.4);
+      const dist = 34 + Math.random() * 34;
+      if (p.style && p.style.setProperty) {
+        p.style.setProperty("--bx", `${Math.cos(angle) * dist}px`);
+        p.style.setProperty("--by", `${Math.sin(angle) * dist}px`);
+      }
+      box.appendChild(p);
+      TimerManager.set(() => p.remove(), 400);
+    }
+  },
+
+  reset() {
+    this.trauma = 0;
+    if (document.documentElement && document.documentElement.style) {
+      document.documentElement.style.setProperty("--shake-x", "0px");
+      document.documentElement.style.setProperty("--shake-y", "0px");
+    }
+  }
+};
+
+// Abonnements découplés aux événements de combat
+EventBus.on("combat:hit", ({ targetBoxId, amount }) => {
+  JuiceFX.flashBox(targetBoxId);
+  JuiceFX.addTrauma(amount >= 14 ? 0.65 : 0.35);
+  JuiceFX.spawnBurst(targetBoxId, "hit", amount >= 14 ? 8 : 5);
+  JuiceFX.popStat(targetBoxId === "enemy-box" ? "enemy-hp-txt" : "player-hp-txt");
+});
+
+EventBus.on("combat:shield", ({ targetBoxId }) => {
+  JuiceFX.spawnBurst(targetBoxId, "shield", 5);
+  JuiceFX.popStat(targetBoxId === "enemy-box" ? "enemy-shield" : "player-shield");
+});
+
+EventBus.on("combat:break", () => {
+  JuiceFX.addTrauma(0.85);
+  JuiceFX.spawnBurst("enemy-box", "chakra", 10);
+});
+
 function spawnFloatingText(targetBoxId, text, type = "damage") {
   const box = document.getElementById(targetBoxId);
   if (!box) return;
@@ -293,7 +497,7 @@ function spawnFloatingText(targetBoxId, text, type = "damage") {
   el.style.top = "35%";
 
   box.appendChild(el);
-  setTimeout(() => el.remove(), 900);
+  TimerManager.set(() => el.remove(), 900);
 }
 
 function triggerShake(id) {
@@ -302,6 +506,7 @@ function triggerShake(id) {
   el.classList.remove("shake");
   void el.offsetWidth;
   el.classList.add("shake");
+  JuiceFX.addTrauma(0.32);
 }
 
 function triggerRush(fighterBoxId, isPlayer = true) {
@@ -321,35 +526,41 @@ function spawnVFX(type, targetBoxId = "enemy-box") {
     const el = document.createElement("div");
     el.className = "vfx-slash";
     targetBox.appendChild(el);
-    setTimeout(() => el.remove(), 260);
+    TimerManager.set(() => el.remove(), 260);
   } else if (type === "smoke" && targetBox) {
     const el = document.createElement("div");
     el.className = "vfx-smoke";
     el.innerText = "💨";
     targetBox.appendChild(el);
-    setTimeout(() => el.remove(), 460);
+    TimerManager.set(() => el.remove(), 460);
   } else if (type === "fuma" && combatZone) {
     const el = document.createElement("div");
     el.className = "vfx-projectile";
     el.innerText = "⚔️";
     combatZone.appendChild(el);
-    setTimeout(() => el.remove(), 310);
+    TimerManager.set(() => el.remove(), 310);
   } else if (type === "water_dragon" && combatZone) {
     const el = document.createElement("div");
     el.className = "vfx-dragon";
     el.innerText = "🐉🌊";
     combatZone.appendChild(el);
-    setTimeout(() => el.remove(), 650);
+    TimerManager.set(() => el.remove(), 650);
   }
 }
 
 function updateNodeMap(currentIndex) {
+  const nodeMap = document.getElementById("node-map");
+  if (!nodeMap) return;
   if (currentIndex >= 4) {
-    document.getElementById("node-map").innerText = currentIndex >= 10 ? `Examen et Konoha · ${STAGES[currentIndex].name}` : `Forêt de la Mort · Combat ${currentIndex - 3}/6`;
+    nodeMap.innerText = currentIndex >= 10
+      ? `Examen et Konoha · ${STAGES[currentIndex].name}`
+      : `Forêt de la Mort · Combat ${currentIndex - 3}/6`;
     return;
   }
   if (!document.getElementById("node-0")) {
-    document.getElementById("node-map").innerHTML = ["⚓ Port", "🌲 Marais", "❄️ Haku", "🍜 Tazuna", "🌉 Zabuza"].map((name, i) => `<div class="node" id="node-${i}"><span class="node-label">${name}</span></div>`).join("");
+    nodeMap.innerHTML = ["⚓ Port", "🌲 Marais", "❄️ Haku", "🍜 Tazuna", "🌉 Zabuza"]
+      .map((name, i) => `<div class="node" id="node-${i}"><span class="node-label">${name}</span></div>`)
+      .join("");
   }
   for (let i = 0; i <= 4; i++) {
     const nodeEl = document.getElementById(`node-${i}`);
@@ -368,7 +579,7 @@ function renderClones() {
   const container = document.getElementById("clones-container");
   if (!container) return;
   container.innerHTML = "";
-  for (let i = 0; i < Math.min(state.player.clones, 4); i++) {
+  for (let i = 0; i < Math.min(state.player.clones, cfg.maxVisibleClones); i++) {
     const img = document.createElement("img");
     img.className = "clone-sprite";
     resolveImgSrc(img, "naruto.png");
@@ -405,7 +616,12 @@ function drawCards(n) {
 }
 
 function loadStage(index) {
-  document.getElementById("overlay").classList.remove("reward-overlay");
+  TimerManager.clearAll();
+  JuiceFX.reset();
+
+  const overlay = document.getElementById("overlay");
+  if (overlay && overlay.classList) overlay.classList.remove("reward-overlay");
+
   currentStageIndex = index;
   storyPhase = "combat";
   const stage = STAGES[index];
@@ -468,12 +684,14 @@ function loadStage(index) {
     activeRelic.onCombatStart(state);
   }
 
-  Forest.prepare(stage);
+  if (typeof Forest !== "undefined" && Forest.prepare) {
+    Forest.prepare(stage);
+  }
   const enemyImg = document.getElementById("enemy-img");
   if (enemyImg && stage.sprite) resolveImgSrc(enemyImg, stage.sprite);
 
   saveGame();
-  drawCards(4);
+  drawCards(cfg.baseDrawCount);
   updateUI();
 
   const logEl = document.getElementById("log");
@@ -486,7 +704,7 @@ function checkBossPhaseTransition() {
 
   if (state.enemy.hp <= (state.enemy.maxHp / 2) && state.enemy.hp > 0) {
     state.enemy.inPhase2 = true;
-    
+
     const enemyBox = document.getElementById("enemy-box");
     if (enemyBox) enemyBox.classList.add("demon-aura");
 
@@ -494,13 +712,14 @@ function checkBossPhaseTransition() {
     if (mistOverlay) mistOverlay.classList.add("active");
 
     AudioEngine.play("kyubi");
+    JuiceFX.addTrauma(0.75);
     document.getElementById("log").innerText = "⚠️ ZABUZA ENRAGÉ : L'aura du Démon du Brouillard s'éveille !";
     spawnFloatingText("enemy-box", "PHASE 2 !", "damage");
   }
 }
 
 function dealDamageToEnemy(amt, piercing = false) {
-  if (Forest.absorbDecoy(amt)) return;
+  if (typeof Forest !== "undefined" && Forest.absorbDecoy && Forest.absorbDecoy(amt)) return;
   triggerShake("enemy-box");
   let directHpDmg = amt;
 
@@ -508,6 +727,7 @@ function dealDamageToEnemy(amt, piercing = false) {
     if (amt <= state.enemy.shield) {
       state.enemy.shield -= amt;
       spawnFloatingText("enemy-box", `-${amt}`, "shield");
+      EventBus.emit("combat:shield", { targetBoxId: "enemy-box" });
       directHpDmg = 0;
     } else {
       const absorbed = state.enemy.shield;
@@ -520,6 +740,7 @@ function dealDamageToEnemy(amt, piercing = false) {
   if (directHpDmg > 0) {
     state.enemy.hp = Math.max(0, state.enemy.hp - directHpDmg);
     spawnFloatingText("enemy-box", `-${directHpDmg}`, "damage");
+    EventBus.emit("combat:hit", { targetBoxId: "enemy-box", amount: directHpDmg });
   }
 
   // Rupture de canalisation
@@ -530,9 +751,10 @@ function dealDamageToEnemy(amt, piercing = false) {
     if (state.enemy.channelDmgTaken >= state.enemy.channelDmgRequired) {
       state.enemy.isChanneling = false;
       AudioEngine.play("break");
+      EventBus.emit("combat:break");
       spawnFloatingText("enemy-box", "RUPTURE !", "heal");
       document.getElementById("log").innerText = "💥 CANALISATION ROMPUE ! Le Dragon Aqueux s'effondre !";
-      
+
       const channelBox = document.getElementById("boss-channel-box");
       if (channelBox) channelBox.style.display = "none";
     }
@@ -561,7 +783,9 @@ function updateChannelUI() {
 }
 
 function hitPlayer(amt) {
-  if (Forest.active()) Forest.recordBlocked(Math.min(state.player.shield, amt));
+  if (typeof Forest !== "undefined" && Forest.active && Forest.active()) {
+    Forest.recordBlocked(Math.min(state.player.shield, amt));
+  }
   triggerShake("naruto-box");
   let directHpDmg = amt;
 
@@ -569,6 +793,7 @@ function hitPlayer(amt) {
     if (amt <= state.player.shield) {
       state.player.shield -= amt;
       spawnFloatingText("naruto-box", `-${amt}`, "shield");
+      EventBus.emit("combat:shield", { targetBoxId: "naruto-box" });
       directHpDmg = 0;
     } else {
       const absorbed = state.player.shield;
@@ -581,6 +806,7 @@ function hitPlayer(amt) {
   if (directHpDmg > 0) {
     state.player.hp = Math.max(0, state.player.hp - directHpDmg);
     spawnFloatingText("naruto-box", `-${directHpDmg}`, "damage");
+    EventBus.emit("combat:hit", { targetBoxId: "naruto-box", amount: directHpDmg });
     if (activeRelic && activeRelic.onDamage) activeRelic.onDamage(state);
   }
   checkPlayerDeath();
@@ -589,6 +815,7 @@ function hitPlayer(amt) {
 function checkPlayerDeath() {
   if (state.player.hp <= 0 && !isGameOver) {
     isGameOver = true;
+    TimerManager.clearAll();
     state.player.hp = 0;
     clearSave();
     updateUI();
@@ -620,6 +847,7 @@ function playCard(idx) {
 
   if (state.player.chakra < effectiveCost) {
     document.getElementById("log").innerText = "Pas assez de Chakra !";
+    JuiceFX.popStat("chakra-display");
     return;
   }
 
@@ -628,9 +856,13 @@ function playCard(idx) {
     return;
   }
 
-  if (Forest.active()) Forest.ensureTarget();
+  const isForestActive = typeof Forest !== "undefined" && Forest.active && Forest.active();
+  if (isForestActive) Forest.ensureTarget();
+
   state.player.chakra -= effectiveCost;
-  if (Forest.active()) Forest.recordChakraSpent(effectiveCost);
+  JuiceFX.popStat("chakra-display");
+
+  if (isForestActive) Forest.recordChakraSpent(effectiveCost);
   if (effectiveCost === 0 && state.player.nextAttackFree && (card.type === "attaque" || card.type === "taijutsu")) {
     state.player.nextAttackFree = false;
   }
@@ -668,6 +900,7 @@ function playCard(idx) {
     state.player.hp = Math.max(0, state.player.hp - card.selfDmg);
     triggerShake("naruto-box");
     spawnFloatingText("naruto-box", `-${card.selfDmg}`, "damage");
+    EventBus.emit("combat:hit", { targetBoxId: "naruto-box", amount: card.selfDmg });
     if (activeRelic && activeRelic.onDamage) activeRelic.onDamage(state);
     if (checkPlayerDeath()) return;
   }
@@ -679,16 +912,18 @@ function playCard(idx) {
   }
 
   let finisherBonusDmg = 0;
-  if (card.finisher && state.player.cardsPlayedThisTurn >= 2) {
-    finisherBonusDmg = 8;
-    state.player.shield += 5;
-    document.getElementById("log").innerText = "Finisher ! +8 dégâts et +5 Bouclier !";
+  if (card.finisher && state.player.cardsPlayedThisTurn >= cfg.finisherMinCards) {
+    finisherBonusDmg = cfg.finisherBonusDmg;
+    state.player.shield += cfg.finisherBonusShield;
+    EventBus.emit("combat:shield", { targetBoxId: "naruto-box" });
+    document.getElementById("log").innerText = `Finisher ! +${cfg.finisherBonusDmg} dégâts et +${cfg.finisherBonusShield} Bouclier !`;
     spawnFloatingText("naruto-box", "Finisher !", "shield");
   }
 
   if (card.retain && card.channelBonus !== undefined) {
     const chakraGain = 1 + card.channelBonus;
     state.player.chakra = Math.min(state.player.maxChakra + 2, state.player.chakra + chakraGain);
+    JuiceFX.popStat("chakra-display");
     document.getElementById("log").innerText = `Mudrâ libéré : +${chakraGain} Chakra !`;
     card.channelBonus = 0;
   }
@@ -704,15 +939,21 @@ function playCard(idx) {
     document.getElementById("log").innerText = "Le brouillard ennemi est totalement dissipé !";
   }
 
-  if (card.chakraGain) state.player.chakra += card.chakraGain;
+  if (card.chakraGain) {
+    state.player.chakra += card.chakraGain;
+    JuiceFX.popStat("chakra-display");
+  }
   if (card.shield) {
     const reduction = state.player.resonance || 0;
-    state.player.shield += Math.max(0, card.shield - reduction);
+    const gained = Math.max(0, card.shield - reduction);
+    state.player.shield += gained;
     state.player.resonance = 0;
+    if (gained > 0) EventBus.emit("combat:shield", { targetBoxId: "naruto-box" });
   }
   if (card.clones) {
     state.player.clones += card.clones;
     renderClones();
+    JuiceFX.popStat("player-clones-txt");
   }
 
   if (card.buffWill) {
@@ -720,25 +961,27 @@ function playCard(idx) {
     document.getElementById("log").innerText = "Volonté du Feu éveillée !";
   }
 
-  let bonusDmg = (state.player.willOfFire && state.player.hp <= (state.player.maxHp / 2)) ? 4 : 0;
+  let bonusDmg = (state.player.willOfFire && state.player.hp <= (state.player.maxHp / 2)) ? cfg.willOfFireBonus : 0;
   let dmg = card.dmg ? (card.dmg + bonusDmg + finisherBonusDmg) : 0;
 
-  if (card.fumaBonus && state.player.clones >= 2) {
-    dmg = 22 + bonusDmg;
+  if (card.fumaBonus && state.player.clones >= cfg.fumaCloneThreshold) {
+    dmg = cfg.fumaBonusDmg + bonusDmg;
     document.getElementById("log").innerText = "Feinte de clone ! Shuriken Fûma dévastateur !";
   }
 
   if (card.name.includes("Naruto Rendan")) {
-    dmg += (state.player.clones * 4);
+    dmg += (state.player.clones * cfg.rendanCloneBonus);
   }
 
   // Précision en fonction de la brume
   if (dmg > 0) {
     let missChance = 0;
     if (state.enemy.denseMist) {
-      missChance = state.player.clones >= 2 ? 0.15 : 0.60;
+      missChance = state.player.clones >= cfg.fumaCloneThreshold
+        ? cfg.denseMistCloneMissChance
+        : cfg.denseMistMissChance;
     } else if (state.enemy.mist) {
-      missChance = state.player.clones >= 2 ? 0 : 0.50;
+      missChance = state.player.clones >= cfg.fumaCloneThreshold ? 0 : cfg.mistMissChance;
     }
 
     if (missChance > 0 && Math.random() < missChance) {
@@ -763,7 +1006,7 @@ function playCard(idx) {
   updateUI();
   renderHand();
 
-  if (Forest.active()) Forest.afterCard();
+  if (isForestActive) Forest.afterCard();
   else if (state.enemy.hp <= 0) handleStageVictory();
 }
 
@@ -771,14 +1014,17 @@ function playCard(idx) {
 // 7. FIN DU TOUR (AVEC BOSS PHASE 2 & SUIRYŪDAN)
 // ==========================================
 function endTurn() {
-  if (Forest.active()) { Forest.endTurn(); return; }
+  if (typeof Forest !== "undefined" && Forest.active && Forest.active()) {
+    Forest.endTurn();
+    return;
+  }
   if (isGameOver || busy || state.enemy.hp <= 0) return;
   busy = true;
 
   if (state.player.clones > 0) {
-    const cDmg = state.player.clones * 3;
+    const cDmg = state.player.clones * cfg.cloneDamagePerClone;
     dealDamageToEnemy(cDmg);
-    AudioEngine.play("hit");
+    AudioEngine.play("hit", { pitchMult: 1.08 });
     document.getElementById("log").innerText = `Les clones frappent pour ${cDmg} dégâts !`;
   }
 
@@ -823,16 +1069,18 @@ function endTurn() {
 
     spawnVFX("water_dragon");
     AudioEngine.play("water_dragon");
+    JuiceFX.addTrauma(0.7);
     document.getElementById("log").innerText = "🌊 SUIRYŪDAN NO JUTSU ! Le Dragon Aqueux percute violemment Naruto !";
-    
-    setTimeout(() => {
-      hitPlayer(state.enemy.channelSpellDmg || 28);
+
+    TimerManager.set(() => {
+      if (!isGameOver) hitPlayer(state.enemy.channelSpellDmg || 28);
     }, 350);
   }
 
   if (move.shield) {
     state.enemy.shield += move.shield;
     AudioEngine.play("block");
+    EventBus.emit("combat:shield", { targetBoxId: "enemy-box" });
   }
 
   // Démarrage de canalisation pour le prochain tour
@@ -853,15 +1101,15 @@ function endTurn() {
 
   const totalAnimTime = hits.length * 160;
   hits.forEach((d, i) => {
-    setTimeout(() => {
+    TimerManager.set(() => {
       if (isGameOver) return;
       spawnVFX("slash", "naruto-box");
       hitPlayer(d);
-      AudioEngine.play("slash");
+      AudioEngine.play("slash", { pitchMult: 1 + i * 0.06 });
     }, i * 160);
   });
 
-  setTimeout(() => {
+  TimerManager.set(() => {
     if (isGameOver) {
       busy = false;
       return;
@@ -898,7 +1146,7 @@ function endTurn() {
     state.player.nextAttackFree = false;
     state.enemy.turnCount++;
 
-    drawCards(4);
+    drawCards(cfg.baseDrawCount);
     updateUI();
     busy = false;
   }, Math.max(totalAnimTime, 120));
@@ -969,7 +1217,7 @@ function updateUI() {
   const intentEl = document.getElementById("enemy-intent");
   if (intentEl) intentEl.innerText = `Prépare : ${nextMove.intent}`;
 
-  Forest.render();
+  if (typeof Forest !== "undefined" && Forest.render) Forest.render();
   updateCounters();
 }
 
@@ -1040,10 +1288,15 @@ let restNextStage = 3;
 let storyPhase = "combat";
 
 function openRestSite(nextStage = 3) {
+  TimerManager.clearAll();
   restNextStage = nextStage;
   storyPhase = "rest";
-  document.querySelector(".rest-box h2").innerText = nextStage >= 10 ? "Préparation de la finale" : nextStage >= 4 ? "Campement dans la forêt" : "Maison de Tazuna";
-  document.querySelector(".rest-box p").innerText = "Récupère 25 PV ou améliore une technique avant le prochain combat.";
+  document.querySelector(".rest-box h2").innerText = nextStage >= 10
+    ? "Préparation de la finale"
+    : nextStage >= 4
+      ? "Campement dans la forêt"
+      : "Maison de Tazuna";
+  document.querySelector(".rest-box p").innerText = `Récupère ${cfg.restHealAmount} PV ou améliore une technique avant le prochain combat.`;
   updateNodeMap(nextStage >= 4 ? nextStage : 3);
   saveGame();
 
@@ -1057,9 +1310,9 @@ function openRestSite(nextStage = 3) {
 }
 
 function takeRest() {
-  state.player.hp = Math.min(state.player.maxHp, state.player.hp + 25);
+  state.player.hp = Math.min(state.player.maxHp, state.player.hp + cfg.restHealAmount);
   AudioEngine.play("kyubi");
-  spawnFloatingText("naruto-box", "+25", "heal");
+  spawnFloatingText("naruto-box", `+${cfg.restHealAmount}`, "heal");
 
   const restScreen = document.getElementById("rest-screen");
   if (restScreen) restScreen.style.display = "none";
@@ -1081,7 +1334,7 @@ function openUpgradePicker() {
 
   if (upgradable.length === 0) {
     picker.innerHTML = `<p style="color:#ef4444;">Toutes tes techniques de base sont déjà améliorées !</p>`;
-    setTimeout(() => { takeRest(); }, 1200);
+    TimerManager.set(() => { takeRest(); }, 1200);
     return;
   }
 
@@ -1143,7 +1396,11 @@ function upgradeCard(cardRef) {
 function handleStageVictory() {
   if (storyPhase === "reward") return;
   storyPhase = "reward";
-  if (currentStageIndex >= 4) { Forest.reward(); return; }
+  TimerManager.clearAll();
+  if (currentStageIndex >= 4) {
+    if (typeof Forest !== "undefined" && Forest.reward) Forest.reward();
+    return;
+  }
   const overlay = document.getElementById("overlay");
   overlay.style.display = "flex";
   const picker = document.getElementById("rewards-picker");
@@ -1221,7 +1478,7 @@ function handleStageVictory() {
 // ==========================================
 // 12. SAUVEGARDE & MENU PRINCIPAL
 // ==========================================
-const SAVE_KEY = "naruto_deckbuilder_save";
+const SAVE_KEY = cfg.saveKey;
 
 function saveGame(exact = false) {
   if (isGameOver) return;
@@ -1237,9 +1494,18 @@ function saveGame(exact = false) {
     deck: [...state.deck, ...state.hand, ...state.discard, ...state.exhausted].filter(c => !c.isCurse && !c.temporary)
   };
   if (exact && storyPhase === "combat") {
-    saveData.snapshot = JSON.parse(JSON.stringify({ state, forest: Forest.active() ? {
-      enemies: Forest.enemies, target: Forest.target, turns: Forest.turns, turnDamage: Forest.turnDamage, trainingChakra: Forest.trainingChakra, trainingBlocked: Forest.trainingBlocked
-    } : null }));
+    const isForestActive = typeof Forest !== "undefined" && Forest.active && Forest.active();
+    saveData.snapshot = JSON.parse(JSON.stringify({
+      state,
+      forest: isForestActive ? {
+        enemies: Forest.enemies,
+        target: Forest.target,
+        turns: Forest.turns,
+        turnDamage: Forest.turnDamage,
+        trainingChakra: Forest.trainingChakra,
+        trainingBlocked: Forest.trainingBlocked
+      } : null
+    }));
   }
   localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
 }
@@ -1264,9 +1530,11 @@ function continueGame() {
   state.player.hp = data.playerHp;
   state.player.maxHp = data.playerMaxHp;
   state.player.willOfFire = !!data.playerWillOfFire;
-  state.player.maxChakra = 3;
+  state.player.maxChakra = cfg.startingChakra;
   activeRelic = null;
-  state.hand = []; state.discard = []; state.exhausted = [];
+  state.hand = [];
+  state.discard = [];
+  state.exhausted = [];
   state.deck = data.deck;
 
   if (data.activeRelicId) {
@@ -1280,11 +1548,14 @@ function continueGame() {
   loadStage(data.currentStageIndex);
   if (data.snapshot && data.storyPhase === "combat") {
     Object.assign(state, data.snapshot.state);
-    if (data.snapshot.forest && Forest.active()) {
+    if (data.snapshot.forest && typeof Forest !== "undefined" && Forest.active && Forest.active()) {
       Object.assign(Forest, data.snapshot.forest);
       Forest.ensureTarget();
     }
-    renderClones(); renderHand(); updateUI(); updateChannelUI();
+    renderClones();
+    renderHand();
+    updateUI();
+    updateChannelUI();
     document.getElementById("dense-mist-overlay").classList.toggle("active", !!state.enemy.denseMist);
     document.getElementById("enemy-box").classList.toggle("demon-aura", !!state.enemy.inPhase2);
     saveGame(true);
@@ -1300,12 +1571,14 @@ function startNewGamePrompt() {
 }
 
 function initNewGame() {
+  TimerManager.clearAll();
+  JuiceFX.reset();
   storyPhase = "combat";
   isGameOver = false;
   activeRelic = null;
-  state.player.hp = 60;
-  state.player.maxHp = 60;
-  state.player.maxChakra = 3;
+  state.player.hp = cfg.startingHp;
+  state.player.maxHp = cfg.startingHp;
+  state.player.maxChakra = cfg.startingChakra;
   state.player.willOfFire = false;
   document.getElementById("relics-bar").innerText = "Relique : Aucune";
 
@@ -1331,9 +1604,12 @@ function initNewGame() {
 // ==========================================
 function canSaveFromOptions() {
   return document.getElementById("main-menu").style.display === "none" &&
-    !MizukiTutorial.active && !isGameOver && (!busy || storyPhase === "reward") &&
+    !(typeof MizukiTutorial !== "undefined" && MizukiTutorial.active) &&
+    !isGameOver &&
+    (!busy || storyPhase === "reward") &&
     !(currentStageIndex === 14 && storyPhase === "reward");
 }
+
 function saveFromOptions() {
   const status = document.getElementById("save-status");
   if (!canSaveFromOptions()) {
@@ -1349,22 +1625,36 @@ function saveFromOptions() {
     return false;
   }
 }
+
 function returnToMainMenu() {
-  if (MizukiTutorial.active) {
-    MizukiTutorial.leave(false); closeSettingsModal(); return;
+  if (typeof MizukiTutorial !== "undefined" && MizukiTutorial.active) {
+    MizukiTutorial.leave(false);
+    closeSettingsModal();
+    return;
   }
   if (document.getElementById("main-menu").style.display !== "none") {
-    closeSettingsModal(); return;
+    closeSettingsModal();
+    return;
   }
-  if (currentStageIndex === 14 && storyPhase === "reward") { location.reload(); return; }
+  if (currentStageIndex === 14 && storyPhase === "reward") {
+    TimerManager.clearAll();
+    location.reload();
+    return;
+  }
   if (storyPhase === "reward" && !isGameOver) {
-    try { saveGame(); } catch (_) {
+    try {
+      saveGame();
+    } catch (_) {
       document.getElementById("save-status").innerText = "Sauvegarde impossible : retour annulé.";
       return;
     }
-  } else if (!isGameOver && !saveFromOptions()) return;
+  } else if (!isGameOver && !saveFromOptions()) {
+    return;
+  }
+  TimerManager.clearAll();
   location.reload();
 }
+
 function openSettingsModal() {
   document.getElementById("save-status").innerText = "";
   document.getElementById("btn-save-game").disabled = !canSaveFromOptions();
@@ -1406,15 +1696,26 @@ function updateDisplaySettings() {
 }
 
 // ==========================================
-// 14. CHARGEMENT INITIAL DE LA PAGE
+// 14. GESTION VISIBILITÉ D'ONGLET & INITIALISATION
 // ==========================================
+if (typeof document !== "undefined" && document.addEventListener) {
+  document.addEventListener("visibilitychange", () => {
+    if (!AudioEngine.musicAudio) return;
+    if (document.hidden) {
+      AudioEngine.musicAudio.pause();
+    } else if (AudioEngine.currentTrack) {
+      AudioEngine.musicAudio.play().catch(() => {});
+    }
+  });
+}
+
 window.onload = () => {
   preloadAllAssets();
   AudioEngine.playMusic("main_menu.m4a");
 
   document.addEventListener("click", () => {
     AudioEngine.init();
-    if (AudioEngine.musicAudio && AudioEngine.musicAudio.paused) {
+    if (AudioEngine.musicAudio && AudioEngine.musicAudio.paused && !document.hidden) {
       AudioEngine.musicAudio.play().catch(() => {});
     }
   }, { once: true });
