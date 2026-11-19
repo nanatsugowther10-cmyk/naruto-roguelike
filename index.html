@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Naruto · Mode histoire</title>
+  <title>Naruto · Shinobi Chronicles</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-port">
@@ -120,7 +120,7 @@
   <div id="rest-screen" style="display: none;">
     <div class="rest-box">
       <h2>Maison de Tazuna (Feu de Camp)</h2>
-      <p>Repose-toi et prépare-toi pour l'affrontement décisif.</p>
+      <p>Repose-toi et prépare-toi pour l'affrontement décisif sur le pont.</p>
       <div id="rest-choices">
         <button class="menu-btn primary-btn" onclick="takeRest()">Dormir (+25 PV)</button>
         <button class="menu-btn" onclick="openUpgradePicker()">Forger une technique (+)</button>
@@ -195,20 +195,49 @@
 
   <section id="mizuki-tutorial" aria-label="Tutoriel contre Mizuki" hidden></section>
 
-  <!-- MENU PRINCIPAL -->
+  <!-- MENU PRINCIPAL (HISTOIRE / ROGUELIKE / OPTIONS) -->
   <div id="main-menu">
     <div class="menu-content">
       <h1 class="menu-title">NARUTO</h1>
-      <h2 class="menu-subtitle">Mode histoire</h2>
+      <h2 class="menu-subtitle" id="menu-view-subtitle">Shinobi Deckbuilder</h2>
       <p id="asset-loading-status" role="status" aria-live="polite">Préparation des images…</p>
-      <div class="menu-buttons">
-        <button data-requires-assets disabled id="btn-continue" class="menu-btn" onclick="continueGame()" style="display: none;">Continuer la mission</button>
-        <button class="menu-btn primary-btn" data-requires-assets disabled onclick="startNewGamePrompt()">Mode histoire · Nouvelle partie</button>
-        <button class="menu-btn" data-requires-assets disabled onclick="Forest.startChapter()">Chapitre 2 · Forêt de la Mort</button>
-        <button class="menu-btn" data-requires-assets disabled onclick="Forest.startExam()">Chapitre 3 · Examen et attaque de Konoha</button>
-        <button class="menu-btn" data-requires-assets disabled onclick="MizukiTutorial.open(true)">Rejouer le tutoriel Mizuki</button>
-        <button class="menu-btn" onclick="openSettingsModal()">Options</button>
+
+      <!-- VUE RACINE : 3 ENTRÉES PRINCIPALES -->
+      <div class="menu-buttons" id="menu-root-view">
+        <button class="menu-btn primary-btn" data-requires-assets disabled onclick="MenuController.openStory()">
+          📜 Histoire
+        </button>
+        <button class="menu-btn menu-btn-roguelike" type="button" onclick="MenuController.selectRoguelike()">
+          🌀 Roguelike <span class="menu-badge-soon">Bientôt</span>
+        </button>
+        <button class="menu-btn" onclick="openSettingsModal()">
+          ⚙️ Options
+        </button>
       </div>
+
+      <!-- SOUS-MENU HISTOIRE -->
+      <div class="menu-buttons menu-story-panel" id="menu-story-view" hidden>
+        <button data-requires-assets disabled id="btn-continue" class="menu-btn primary-btn" onclick="continueGame()" style="display: none;">
+          ▶ Continuer la mission
+        </button>
+        <button class="menu-btn" data-requires-assets disabled onclick="startNewGamePrompt()">
+          Nouvelle partie (Prologue &amp; Arc 1)
+        </button>
+        <button class="menu-btn" data-requires-assets disabled onclick="Forest.startChapter()">
+          Chapitre 2 · Forêt de la Mort
+        </button>
+        <button class="menu-btn" data-requires-assets disabled onclick="Forest.startExam()">
+          Chapitre 3 · Examen &amp; Konoha
+        </button>
+        <button class="menu-btn" data-requires-assets disabled onclick="MizukiTutorial.open(true)">
+          Rejouer le tutoriel Mizuki
+        </button>
+        <button class="menu-btn menu-btn-back" type="button" onclick="MenuController.backToRoot()">
+          ← Retour
+        </button>
+      </div>
+
+      <p id="menu-mode-notice" role="status" aria-live="polite"></p>
     </div>
   </div>
 
@@ -219,5 +248,3 @@
   <script src="js/progression.js"></script>
 </body>
 </html>
-
-

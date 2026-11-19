@@ -1,5 +1,63 @@
 // ==========================================
-// CARTE DE PROGRESSION INTERACTIVE (BRANCHING)
+// 1. CONTRÔLEUR DU MENU PRINCIPAL (HISTOIRE / ROGUELIKE / OPTIONS)
+// ==========================================
+const MenuController = {
+  view: "root",
+
+  openStory() {
+    this.view = "story";
+    const root = document.getElementById("menu-root-view");
+    const story = document.getElementById("menu-story-view");
+    const sub = document.getElementById("menu-view-subtitle");
+    const notice = document.getElementById("menu-mode-notice");
+    if (root) root.hidden = true;
+    if (story) story.hidden = false;
+    if (sub) sub.innerText = "Mode Histoire";
+    if (notice) notice.innerText = "";
+
+    const btnContinue = document.getElementById("btn-continue");
+    if (btnContinue) {
+      btnContinue.style.display = hasSavedGame() ? "block" : "none";
+    }
+  },
+
+  backToRoot() {
+    this.view = "root";
+    const root = document.getElementById("menu-root-view");
+    const story = document.getElementById("menu-story-view");
+    const sub = document.getElementById("menu-view-subtitle");
+    const notice = document.getElementById("menu-mode-notice");
+    if (root) root.hidden = false;
+    if (story) story.hidden = true;
+    if (sub) sub.innerText = "Shinobi Deckbuilder";
+    if (notice) notice.innerText = "";
+  },
+
+  selectRoguelike() {
+    const notice = document.getElementById("menu-mode-notice");
+    if (notice) {
+      notice.innerText = "Le mode Roguelike (runs aléatoires en 3 actes) arrive prochainement.";
+    }
+    if (typeof AudioEngine !== "undefined" && AudioEngine.play) {
+      AudioEngine.play("block");
+    }
+  }
+};
+
+// Assure que quitter le tutoriel ou revenir au menu réinitialise proprement la vue
+if (typeof MizukiTutorial !== "undefined" && MizukiTutorial.leave) {
+  const _baseTutorialLeave = MizukiTutorial.leave.bind(MizukiTutorial);
+  MizukiTutorial.leave = function(startStory) {
+    const replay = this.replay;
+    _baseTutorialLeave(startStory);
+    if (!startStory || replay) {
+      MenuController.backToRoot();
+    }
+  };
+}
+
+// ==========================================
+// 2. CARTE DE PROGRESSION INTERACTIVE (BRANCHING)
 // ==========================================
 const STORY_BRANCHES = {
   // Arc 1 : Pays des Vagues
@@ -95,7 +153,6 @@ handleStageVictory = function() {
   const picker = document.getElementById("rewards-picker");
   if (!picker) return;
 
-  // Remplace l'action de sélection de carte pour ouvrir le choix d'embranchement
   const renderBranchChoice = () => {
     document.getElementById("overlay-title").innerText = "Embranchement Tactique";
     document.getElementById("overlay-sub").innerText = branch.prompt;
@@ -114,10 +171,8 @@ handleStageVictory = function() {
     });
   };
 
-  // Intercepte les clics sur les cartes de récompense ou le bouton passer
   [...picker.children].forEach(child => {
-    const origClick = child.onclick;
-    child.onclick = (ev) => {
+    child.onclick = () => {
       if (child.classList.contains("reward-card") || child.classList.contains("card")) {
         const cardName = child.querySelector(".card-title")?.innerText;
         const found = [...REWARD_OPTIONS, ...EXAM_REWARDS, ...TRAINING_REWARDS].find(c => c.name === cardName);
@@ -129,7 +184,7 @@ handleStageVictory = function() {
 };
 
 // ==========================================
-// ÉPURATION DE DECK AU CAMPEMENT (-1 CARTE)
+// 3. ÉPURATION DE DECK AU CAMPEMENT (-1 CARTE)
 // ==========================================
 function openPurgePicker() {
   const restChoices = document.getElementById("rest-choices");
