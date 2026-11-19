@@ -1204,3 +1204,28 @@ body.reduce-motion .shake {
   justify-content: center;
   margin-top: 10px;
 }
+
+/* ==========================================
+   BADGE DE RYTHME / COMBO EN COMBAT
+   ========================================== */
+#combo-style-badge {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+  animation: combo-badge-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes combo-badge-pop {
+  0% { transform: scale(0.82); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
