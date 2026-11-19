@@ -340,6 +340,9 @@ const cfg = typeof GAME_CONFIG !== "undefined" ? GAME_CONFIG : {
   fumaCloneThreshold: 2,
   fumaBonusDmg: 22,
   rendanCloneBonus: 4,
+  rasenganPerCardBonus: 3,
+  shadowTransferDrawPerClone: 1,
+  kawarimiEchoShieldPerCard: 3,
   mistMissChance: 0.50,
   denseMistMissChance: 0.60,
   denseMistCloneMissChance: 0.15,
@@ -856,6 +859,11 @@ function playCard(idx) {
     return;
   }
 
+  if (card.sacrificeAllClones && state.player.clones <= 0) {
+    document.getElementById("log").innerText = "Il te faut au moins 1 Clone actif à dissiper !";
+    return;
+  }
+
   const isForestActive = typeof Forest !== "undefined" && Forest.active && Forest.active();
   if (isForestActive) Forest.ensureTarget();
 
@@ -871,6 +879,18 @@ function playCard(idx) {
     state.player.clones -= card.cloneCost;
     renderClones();
     spawnVFX("smoke", "naruto-box");
+  }
+
+  if (card.sacrificeAllClones) {
+    const sacrificed = state.player.clones;
+    state.player.clones = 0;
+    renderClones();
+    spawnVFX("smoke", "naruto-box");
+    state.player.chakra += sacrificed;
+    JuiceFX.popStat("chakra-display");
+    drawCards(sacrificed * (cfg.shadowTransferDrawPerClone || 1));
+    document.getElementById("log").innerText = `Transfert d'ombre : +${sacrificed} Chakra et +${sacrificed} carte(s) !`;
+    spawnFloatingText("naruto-box", `+${sacrificed} Chakra`, "heal");
   }
 
   if (card.isCurse) {
@@ -939,13 +959,35 @@ function playCard(idx) {
     document.getElementById("log").innerText = "Le brouillard ennemi est totalement dissipé !";
   }
 
+  if (card.purgeHandCurses) {
+    let purgedCount = 0;
+    for (let i = state.hand.length - 1; i >= 0; i--) {
+      if (i === idx) continue;
+      if (state.hand[i].isCurse || state.hand[i].temporary) {
+        const removed = state.hand.splice(i, 1)[0];
+        if (i < idx) idx--;
+        if (!removed.temporary) state.exhausted.push(removed);
+        purgedCount++;
+      }
+    }
+    if (purgedCount > 0) {
+      state.player.chakra += purgedCount;
+      JuiceFX.popStat("chakra-display");
+      spawnFloatingText("naruto-box", `Kai ! +${purgedCount} Chakra`, "heal");
+      document.getElementById("log").innerText = `Kai ! ${purgedCount} fléau(x) dissipé(s) (+${purgedCount} Chakra) !`;
+    }
+  }
+
   if (card.chakraGain) {
     state.player.chakra += card.chakraGain;
     JuiceFX.popStat("chakra-display");
   }
   if (card.shield) {
     const reduction = state.player.resonance || 0;
-    const gained = Math.max(0, card.shield - reduction);
+    const comboShieldBonus = card.scaleShieldCardsPlayed
+      ? state.player.cardsPlayedThisTurn * (cfg.kawarimiEchoShieldPerCard || 3)
+      : 0;
+    const gained = Math.max(0, card.shield + comboShieldBonus - reduction);
     state.player.shield += gained;
     state.player.resonance = 0;
     if (gained > 0) EventBus.emit("combat:shield", { targetBoxId: "naruto-box" });
@@ -962,7 +1004,15 @@ function playCard(idx) {
   }
 
   let bonusDmg = (state.player.willOfFire && state.player.hp <= (state.player.maxHp / 2)) ? cfg.willOfFireBonus : 0;
-  let dmg = card.dmg ? (card.dmg + bonusDmg + finisherBonusDmg) : 0;
+  let baseCardDmg = card.dmg || 0;
+  if (card.lowHpDouble && state.player.hp <= (state.player.maxHp / 2)) {
+    baseCardDmg *= 2;
+    document.getElementById("log").innerText = "Manteau du Démon déchaîné ! Dégâts doublés !";
+  }
+  if (card.scaleCardsPlayed) {
+    baseCardDmg += state.player.cardsPlayedThisTurn * (cfg.rasenganPerCardBonus || 3);
+  }
+  let dmg = baseCardDmg ? (baseCardDmg + bonusDmg + finisherBonusDmg) : 0;
 
   if (card.fumaBonus && state.player.clones >= cfg.fumaCloneThreshold) {
     dmg = cfg.fumaBonusDmg + bonusDmg;
@@ -1177,6 +1227,10 @@ function renderHand() {
     if (card.cloneCost) extraBadge = `<span class="badge-tag">Sacrifice (${card.cloneCost})</span>`;
     if (card.retain) extraBadge = `<span class="badge-tag">Mudrâ (+${card.channelBonus || 0})</span>`;
     if (card.exhaust) extraBadge = `<span class="badge-tag">Éphémère</span>`;
+    if (card.scaleCardsPlayed || card.scaleShieldCardsPlayed) extraBadge = `<span class="badge-tag">Combo (+${state.player.cardsPlayedThisTurn})</span>`;
+    if (card.sacrificeAllClones) extraBadge = `<span class="badge-tag">Sacrifice Tout</span>`;
+    if (card.purgeHandCurses) extraBadge = `<span class="badge-tag">Dissipation</span>`;
+    if (card.lowHpDouble) extraBadge = `<span class="badge-tag">Rage &le;50%</span>`;
     if (card.isCurse) extraBadge = `<span class="badge-tag badge-curse">Fléau</span>`;
 
     el.innerHTML = `

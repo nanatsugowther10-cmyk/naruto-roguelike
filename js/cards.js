@@ -15,6 +15,9 @@ const GAME_CONFIG = {
   fumaCloneThreshold: 2,
   fumaBonusDmg: 22,
   rendanCloneBonus: 4,
+  rasenganPerCardBonus: 3,
+  shadowTransferDrawPerClone: 1,
+  kawarimiEchoShieldPerCard: 3,
   mistMissChance: 0.50,
   denseMistMissChance: 0.60,
   denseMistCloneMissChance: 0.15,
@@ -215,6 +218,63 @@ const CARDS_POOL = [
     desc: "Un barrage dévastateur de 18 dégâts physiques.",
     img: "card_2000poings.png",
     icon: "👊"
+  },
+
+  // --- NOUVELLES CARTES DE SYNERGIE (GAMEPLAY PUR) ---
+  {
+    id: "rasengan_tourbillon",
+    name: "Orbe Tourbillonnant",
+    cost: 2,
+    dmg: 12,
+    scaleCardsPlayed: true,
+    type: "attaque",
+    desc: "12 dégâts + 3 dégâts par carte déjà jouée ce tour.",
+    img: "card_rendan.png",
+    icon: "🌀"
+  },
+  {
+    id: "transfert_ombre",
+    name: "Transfert d'Expérience",
+    cost: 0,
+    sacrificeAllClones: true,
+    type: "clone",
+    desc: "Sacrifie tous tes Clones actifs : pioche 1 carte et gagne +1 Chakra par clone sacrifié.",
+    img: "card_clones.png",
+    icon: "🔄"
+  },
+  {
+    id: "dissipation_chakra",
+    name: "Kai ! Dissipation",
+    cost: 0,
+    purgeHandCurses: true,
+    shield: 4,
+    type: "chakra",
+    desc: "+4 Bouclier. Dissipe tous les Fléaux/Distractions de ta main (+1 Chakra par carte dissipée).",
+    img: "card_volonte.png",
+    icon: "✨"
+  },
+  {
+    id: "permutation_reactive",
+    name: "Permutation Réactive",
+    cost: 1,
+    shield: 5,
+    scaleShieldCardsPlayed: true,
+    type: "defense",
+    desc: "5 Bouclier + 3 Bouclier par carte jouée ce tour.",
+    img: "card_kawarimi.png",
+    icon: "🪵"
+  },
+  {
+    id: "manteau_renard",
+    name: "Manteau du Démon",
+    cost: 1,
+    dmg: 10,
+    selfDmg: 3,
+    lowHpDouble: true,
+    type: "kyubi",
+    desc: "Perds 3 PV. Inflige 10 dégâts (20 dégâts si tes PV sont <= 50%).",
+    img: "card_kyubi.png",
+    icon: "🔥"
   }
 ];
 
