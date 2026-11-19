@@ -116,14 +116,15 @@
     <button id="end-turn-btn" onclick="endTurn()">Fin du tour</button>
   </footer>
 
-  <!-- REPOS CHEZ TAZUNA -->
+  <!-- REPOS CHEZ TAZUNA / CAMPEMENT -->
   <div id="rest-screen" style="display: none;">
     <div class="rest-box">
       <h2>Maison de Tazuna (Feu de Camp)</h2>
-      <p>Repose-toi et prépare-toi pour l'affrontement décisif sur le pont.</p>
+      <p>Repose-toi et prépare-toi pour l'affrontement décisif.</p>
       <div id="rest-choices">
         <button class="menu-btn primary-btn" onclick="takeRest()">Dormir (+25 PV)</button>
         <button class="menu-btn" onclick="openUpgradePicker()">Forger une technique (+)</button>
+        <button class="menu-btn" onclick="openPurgePicker()">Méditer (-1 Carte)</button>
       </div>
       <div id="upgrade-picker" style="display:none;"></div>
     </div>
